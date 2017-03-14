@@ -1,12 +1,14 @@
 """
 Implements an asynchronous interface for a Frontier Silicon device.
+
 For example internet radios from: Medion, Hama, Auna, ...
 """
 import asyncio
 import aiohttp
 from lxml import objectify
 
- # pylint: disable=R0904
+
+# pylint: disable=R0904
 class AFSAPI():
     """Builds the interface to a Frontier Silicon device."""
 
@@ -44,6 +46,7 @@ class AFSAPI():
     }
 
     def __init__(self, fsapi_device_url, pin):
+        """Initialize the Frontier Silicon device."""
         self.fsapi_device_url = fsapi_device_url
         self.pin = pin
         self.sid = None
@@ -54,6 +57,7 @@ class AFSAPI():
         self.__session = aiohttp.ClientSession()
 
     def __del__(self):
+        """Destroy the device and http sessions."""
         self.call('DELETE_SESSION')
         self.__session.close()
 
@@ -268,7 +272,7 @@ class AFSAPI():
     # Mute
     @asyncio.coroutine
     def get_mute(self):
-        "Check if the device is muted."
+        """Check if the device is muted."""
         mute = (yield from self.handle_int(self.API.get('mute')))
         return bool(mute)
 
@@ -319,7 +323,8 @@ class AFSAPI():
     @asyncio.coroutine
     def play_control(self, value):
         """
-        Controls the player of the device.
+        Control the player of the device.
+
         1=Play; 2=Pause; 3=Next; 4=Previous (song/station)
         """
         return (yield from self.handle_set(self.API.get('control'), value))
@@ -331,17 +336,17 @@ class AFSAPI():
 
     @asyncio.coroutine
     def pause(self):
-        """Pause media."""
+        """Pause playing."""
         return (yield from self.play_control(2))
 
     @asyncio.coroutine
     def next(self):
-        """Next media."""
+        """Play next media."""
         return (yield from self.play_control(3))
 
     @asyncio.coroutine
     def prev(self):
-        """Previous media."""
+        """Play previous media."""
         return (yield from self.play_control(4))
 
     @asyncio.coroutine
@@ -362,7 +367,7 @@ class AFSAPI():
     # Sleep
     @asyncio.coroutine
     def get_sleep(self):
-        "Check when and if the device is going to sleep."
+        """Check when and if the device is going to sleep."""
         return (yield from self.handle_long(self.API.get('sleep')))
 
     @asyncio.coroutine

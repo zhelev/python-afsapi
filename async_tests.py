@@ -2,14 +2,14 @@
 import asyncio
 from afsapi import AFSAPI
 
+
 URL = 'http://192.168.1.180:80/device'
 PIN = 1234
 
 
-
 @asyncio.coroutine
 def test_sys():
-    """ Test sys functions."""
+    """Test sys functions."""
     afsapi = AFSAPI(URL, PIN)
 
     set_power = yield from afsapi.set_power(True)
@@ -54,9 +54,10 @@ def test_sys():
     power = yield from afsapi.get_power()
     print('Power on: %s' % power)
 
+
 @asyncio.coroutine
 def test_volume():
-    """ Test volume functions."""
+    """Test volume functions."""
     afsapi = AFSAPI(URL, PIN)
 
     set_power = yield from afsapi.set_power(True)
@@ -83,9 +84,10 @@ def test_volume():
     power = yield from afsapi.get_power()
     print('Power on: %s' % power)
 
+
 @asyncio.coroutine
 def test_info():
-    """ Test info functions."""
+    """Test info functions."""
     afsapi = AFSAPI(URL, PIN)
 
     set_power = yield from afsapi.set_power(True)
@@ -118,9 +120,10 @@ def test_info():
     power = yield from afsapi.get_power()
     print('Power on: %s' % power)
 
+
 @asyncio.coroutine
 def test_play():
-    """ Test play functions."""
+    """Test play functions."""
     afsapi = AFSAPI(URL, PIN)
 
     status = yield from afsapi.get_play_status()
