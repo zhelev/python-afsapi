@@ -139,11 +139,11 @@ def test_play():
         status = yield from afsapi.get_play_status()
         print('Status: %s' % status)
 
-        anext = yield from afsapi.next()
-        print('Next succeeded? - %s' % anext)
+        forward = yield from afsapi.forward()
+        print('Next succeeded? - %s' % forward)
 
-        prev = yield from afsapi.prev()
-        print('Prev succeeded? - %s' % prev)
+        rewind = yield from afsapi.rewind()
+        print('Prev succeeded? - %s' % rewind)
     except Exception as e:
         logging.error(traceback.format_exc())
 

@@ -350,12 +350,12 @@ class AFSAPI():
         return (yield from self.play_control(2))
 
     @asyncio.coroutine
-    def next(self):
+    def forward(self):
         """Next media."""
         return (yield from self.play_control(3))
 
     @asyncio.coroutine
-    def prev(self):
+    def rewind(self):
         """Previous media."""
         return (yield from self.play_control(4))
 

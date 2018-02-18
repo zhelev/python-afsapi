@@ -26,7 +26,7 @@ PROJECT_CLASSIFIERS = [
 ]
 
 setup(name='afsapi',
-      version='0.0.2',
+      version='0.0.3',
       description='Asynchronous Implementation of the Frontier Silicon API',
       author='Krasimir Zhelev',
       author_email='krasimir.zhelev@gmail.com',
