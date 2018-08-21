@@ -26,13 +26,13 @@ PROJECT_CLASSIFIERS = [
 ]
 
 setup(name='afsapi',
-      version='0.0.3',
+      version='0.0.4',
       description='Asynchronous Implementation of the Frontier Silicon API',
       author='Krasimir Zhelev',
       author_email='krasimir.zhelev@gmail.com',
       keywords='afsapi async fsapi frontier silicon',
       license="Apache License 2.0",
-      download_url='https://github.com/zhelev/python-afsapi/archive/0.0.1.zip',
+      download_url='https://github.com/zhelev/python-afsapi/archive/0.0.4.zip',
       url='https://github.com/zhelev/python-afsapi.git',
       maintainer='Krasimir Zhelev',
       maintainer_email='krasimir.zhelev@gmail.com',
