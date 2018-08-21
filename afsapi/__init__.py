@@ -5,12 +5,17 @@ For example internet radios from: Medion, Hama, Auna, ...
 """
 import asyncio
 import aiohttp
+import logging
+import traceback
+
 from lxml import objectify
 
 
 # pylint: disable=R0904
 class AFSAPI():
     """Builds the interface to a Frontier Silicon device."""
+
+    DEFAULT_TIMEOUT_IN_SECONDS = 1
 
     # states
     PLAY_STATES = {
@@ -45,10 +50,12 @@ class AFSAPI():
         'duration': 'netRemote.play.info.duration',
     }
 
-    def __init__(self, fsapi_device_url, pin):
+    def __init__(self, fsapi_device_url, pin, timeout=DEFAULT_TIMEOUT_IN_SECONDS):
         """Initialize the Frontier Silicon device."""
         self.fsapi_device_url = fsapi_device_url
         self.pin = pin
+        self.timeout = timeout
+
         self.sid = None
         self.__webfsapi = None
         self.__modes = None
@@ -66,7 +73,7 @@ class AFSAPI():
     @asyncio.coroutine
     def get_fsapi_endpoint(self):
         """Parse the fsapi endpoint from the device url."""
-        endpoint = yield from self.__session.get(self.fsapi_device_url)
+        endpoint = yield from self.__session.get(self.fsapi_device_url, timeout = self.timeout)
         text = yield from endpoint.text(encoding='utf-8')
         doc = objectify.fromstring(text)
         return doc.webfsapi.text
@@ -75,7 +82,8 @@ class AFSAPI():
     def create_session(self):
         """Create a session on the frontier silicon device."""
         req_url = '%s/%s' % (self.__webfsapi, 'CREATE_SESSION')
-        sid = yield from self.__session.get(req_url, params=dict(pin=self.pin))
+        sid = yield from self.__session.get(req_url, params=dict(pin=self.pin),
+                                            timeout = self.timeout)
         text = yield from sid.text(encoding='utf-8')
         doc = objectify.fromstring(text)
         return doc.sessionId.text
@@ -83,30 +91,37 @@ class AFSAPI():
     @asyncio.coroutine
     def call(self, path, extra=None):
         """Execute a frontier silicon API call."""
-        if not self.__webfsapi:
-            self.__webfsapi = yield from self.get_fsapi_endpoint()
+        try:
+            if not self.__webfsapi:
+                self.__webfsapi = yield from self.get_fsapi_endpoint()
 
-        if not self.sid:
-            self.sid = yield from self.create_session()
+            if not self.sid:
+                self.sid = yield from self.create_session()
 
-        if not isinstance(extra, dict):
-            extra = dict()
+            if not isinstance(extra, dict):
+                extra = dict()
 
-        params = dict(pin=self.pin, sid=self.sid)
-        params.update(**extra)
-
-        req_url = ('%s/%s' % (self.__webfsapi, path))
-        result = yield from self.__session.get(req_url, params=params)
-        if result.status == 200:
-            text = yield from result.text(encoding='utf-8')
-        else:
-            self.sid = yield from self.create_session()
             params = dict(pin=self.pin, sid=self.sid)
             params.update(**extra)
-            result = yield from self.__session.get(req_url, params=params)
-            text = yield from result.text(encoding='utf-8')
 
-        return objectify.fromstring(text)
+            req_url = ('%s/%s' % (self.__webfsapi, path))
+            result = yield from self.__session.get(req_url, params=params,
+                                                   timeout = self.timeout)
+            if result.status == 200:
+                text = yield from result.text(encoding='utf-8')
+            else:
+                self.sid = yield from self.create_session()
+                params = dict(pin=self.pin, sid=self.sid)
+                params.update(**extra)
+                result = yield from self.__session.get(req_url, params=params,
+                                                       timeout = self.timeout)
+                text = yield from result.text(encoding='utf-8')
+
+            return objectify.fromstring(text)
+        except Exception as e:
+            logging.info('AFSAPI Exception: ' +traceback.format_exc())
+
+        return None
 
     # Helper methods
 
@@ -340,13 +355,13 @@ class AFSAPI():
         return (yield from self.play_control(2))
 
     @asyncio.coroutine
-    def next(self):
-        """Play next media."""
+    def forward(self):
+        """Next media."""
         return (yield from self.play_control(3))
 
     @asyncio.coroutine
-    def prev(self):
-        """Play previous media."""
+    def rewind(self):
+        """Previous media."""
         return (yield from self.play_control(4))
 
     @asyncio.coroutine
