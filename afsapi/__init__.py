@@ -66,7 +66,12 @@ class AFSAPI():
     def __del__(self):
         """Destroy the device and http sessions."""
         self.call('DELETE_SESSION')
-        self.__session.close()
+        if not self.__session.closed:
+            if self.__session._connector_owner:
+                self.__session._connector.close()
+            self.__session._connector = None
+        # session close fails on newer versions of aiohttp, replaced by the code above
+        # self.__session.close()
 
     # http request helpers
 
