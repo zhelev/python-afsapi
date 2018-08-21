@@ -2,8 +2,7 @@
 import asyncio
 from afsapi import AFSAPI
 
-
-URL = 'http://192.168.1.180:80/device'
+URL = 'http://192.168.0.66:80/device'
 PIN = 1234
 
 
@@ -129,15 +128,17 @@ def test_play():
     status = yield from afsapi.get_play_status()
     print('Status: %s' % status)
 
-    anext = yield from afsapi.next()
+    anext = yield from afsapi.forward()
     print('Next succeeded? - %s' % anext)
 
-    prev = yield from afsapi.prev()
+    prev = yield from afsapi.rewind()
     print('Prev succeeded? - %s' % prev)
 
 LOOP = asyncio.get_event_loop()
+
 LOOP.run_until_complete(test_sys())
 LOOP.run_until_complete(test_volume())
 LOOP.run_until_complete(test_play())
 LOOP.run_until_complete(test_info())
+
 LOOP.close()
