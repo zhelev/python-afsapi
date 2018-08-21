@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 PACKAGES = find_packages(exclude=['tests', 'tests.*'])
 
 REQUIRES = [
-    'aiohttp>=1.3.1',
+    'aiohttp>=3.3.2',
     'lxml>=3.6.0'
 ]
 
