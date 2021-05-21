@@ -3,7 +3,7 @@ Implements an asynchronous interface for a Frontier Silicon device.
 
 For example internet radios from: Medion, Hama, Auna, ...
 """
-import asyncio
+
 import logging
 import traceback
 
@@ -50,7 +50,8 @@ class AFSAPI():
         'duration': 'netRemote.play.info.duration',
     }
 
-    def __init__(self, fsapi_device_url, pin, timeout=DEFAULT_TIMEOUT_IN_SECONDS):
+    def __init__(self, fsapi_device_url, pin,
+                 timeout=DEFAULT_TIMEOUT_IN_SECONDS):
         """Initialize the Frontier Silicon device."""
         self.fsapi_device_url = fsapi_device_url
         self.pin = pin
@@ -66,7 +67,8 @@ class AFSAPI():
 
     async def get_fsapi_endpoint(self, client):
         """Parse the fsapi endpoint from the device url."""
-        endpoint = await client.get(self.fsapi_device_url, timeout=self.timeout)
+        endpoint = await client.get(self.fsapi_device_url,
+                                    timeout=self.timeout)
         text = await endpoint.text(encoding='utf-8')
         doc = objectify.fromstring(text)
         return doc.webfsapi.text
@@ -114,7 +116,7 @@ class AFSAPI():
         """Execute a frontier silicon API call."""
         try:
             return await self.__call(path, extra)
-        except Exception as e:
+        except Exception:
             logging.info('AFSAPI Exception: ' + traceback.format_exc())
 
         return None

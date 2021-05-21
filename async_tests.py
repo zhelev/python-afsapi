@@ -7,7 +7,8 @@ from afsapi import AFSAPI
 
 URL = 'http://192.168.0.66:80/device'
 PIN = 1234
-TIMEOUT = 2 # in seconds
+TIMEOUT = 2  # in seconds
+
 
 @asyncio.coroutine
 def test_sys():
@@ -20,9 +21,6 @@ def test_sys():
 
         power = yield from afsapi.get_power()
         print('Power on: %s' % power)
-
-        end_point = yield from afsapi.get_fsapi_endpoint()
-        print('Endpoint: %s' % end_point)
 
         set_friendly_name = yield from afsapi.set_friendly_name('Badezimmer')
         print('Set friendly name? - %s' % set_friendly_name)
@@ -56,7 +54,7 @@ def test_sys():
 
         power = yield from afsapi.get_power()
         print('Power on: %s' % power)
-    except Exception as e:
+    except Exception:
         logging.error(traceback.format_exc())
 
 
@@ -89,7 +87,7 @@ def test_volume():
 
         power = yield from afsapi.get_power()
         print('Power on: %s' % power)
-    except Exception as e:
+    except Exception:
         logging.error(traceback.format_exc())
 
 
@@ -128,7 +126,7 @@ def test_info():
 
         power = yield from afsapi.get_power()
         print('Power on: %s' % power)
-    except Exception as e:
+    except Exception:
         logging.error(traceback.format_exc())
 
 
@@ -146,8 +144,9 @@ def test_play():
 
         rewind = yield from afsapi.rewind()
         print('Prev succeeded? - %s' % rewind)
-    except Exception as e:
+    except Exception:
         logging.error(traceback.format_exc())
+
 
 LOOP = asyncio.get_event_loop()
 
