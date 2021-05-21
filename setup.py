@@ -42,4 +42,4 @@ setup(name='afsapi',
       platforms='any',
       install_requires=REQUIRES,
       classifiers=PROJECT_CLASSIFIERS,
-     )
+      )
