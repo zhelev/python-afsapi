@@ -1,0 +1,20 @@
+---
+name: Yaml Lint
+on:
+  push:
+    paths:
+      - '**.yml'
+      - '**.yaml'
+jobs:
+  lintAllTheThings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: yaml-lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_data: |
+            extends: default
+            rules:
+              truthy: disable
+...
