@@ -9,6 +9,9 @@ import traceback
 
 import aiohttp
 from lxml import objectify
+from typing import Any, Dict, List, Optional, Union
+
+DataItem = Union[str, int]
 
 
 # pylint: disable=R0904
@@ -50,39 +53,42 @@ class AFSAPI():
         'duration': 'netRemote.play.info.duration',
     }
 
-    def __init__(self, fsapi_device_url, pin,
-                 timeout=DEFAULT_TIMEOUT_IN_SECONDS):
+    def __init__(self, fsapi_device_url: str, pin: Union[str, int],
+                 timeout: int = DEFAULT_TIMEOUT_IN_SECONDS):
         """Initialize the Frontier Silicon device."""
         self.fsapi_device_url = fsapi_device_url
-        self.pin = pin
+        self.pin = str(pin)
         self.timeout = timeout
 
-        self.sid = None
-        self.__webfsapi = None
-        self.__modes = None
-        self.__volume_steps = None
-        self.__equalisers = None
+        self.sid: Optional[str] = None
+        self.__webfsapi: Optional[str] = None
+        self.__modes: Optional[List[str]] = None
+        self.__volume_steps: Optional[int] = None
+        self.__equalisers: Optional[List[str]] = None
 
     # http request helpers
 
-    async def get_fsapi_endpoint(self, client):
+    async def get_fsapi_endpoint(self, client: aiohttp.ClientSession) -> str:
         """Parse the fsapi endpoint from the device url."""
         endpoint = await client.get(self.fsapi_device_url,
                                     timeout=self.timeout)
         text = await endpoint.text(encoding='utf-8')
         doc = objectify.fromstring(text)
-        return doc.webfsapi.text
+        return str(doc.webfsapi.text)
 
-    async def create_session(self, client):
+    async def create_session(self, client: aiohttp.ClientSession) -> str:
         """Create a session on the frontier silicon device."""
         req_url = '%s/%s' % (self.__webfsapi, 'CREATE_SESSION')
         sid = await client.get(req_url, params=dict(pin=self.pin),
                                timeout=self.timeout)
         text = await sid.text(encoding='utf-8')
         doc = objectify.fromstring(text)
-        return doc.sessionId.text
+        return str(doc.sessionId.text)
 
-    async def __call(self, path, extra):
+    async def __call(self,
+                     path: str,
+                     extra: Optional[Dict[str, DataItem]] = None)\
+            -> objectify.ObjectifiedElement:
         connector = aiohttp.TCPConnector(force_close=True)
         async with aiohttp.ClientSession(connector=connector) as client:
             if not self.__webfsapi:
@@ -94,7 +100,7 @@ class AFSAPI():
             if not isinstance(extra, dict):
                 extra = dict()
 
-            params = dict(pin=self.pin, sid=self.sid)
+            params: Dict[str, DataItem] = dict(pin=self.pin, sid=self.sid)
             params.update(**extra)
 
             req_url = ('%s/%s' % (self.__webfsapi, path))
@@ -112,7 +118,10 @@ class AFSAPI():
 
             return objectify.fromstring(text)
 
-    async def call(self, path, extra=None):
+    async def call(self,
+                   path: str,
+                   extra: Optional[Dict[str, DataItem]] = None
+                   ) -> Optional[objectify.ObjectifiedElement]:
         """Execute a frontier silicon API call."""
         try:
             return await self.__call(path, extra)
@@ -124,12 +133,14 @@ class AFSAPI():
     # Helper methods
 
     # Handlers
-    async def handle_get(self, item):
+    async def handle_get(self, item: str) \
+            -> Optional[objectify.ObjectifiedElement]:
         """Helper method for reading a value by using the fsapi API."""
         res = await self.call('GET/{}'.format(item))
         return res
 
-    async def handle_set(self, item, value):
+    async def handle_set(self, item: str, value: DataItem) \
+            -> Optional[bool]:
         """Helper method for setting a value by using the fsapi API."""
         doc = await self.call('SET/{}'.format(item), dict(value=value))
         if doc is None:
@@ -137,15 +148,15 @@ class AFSAPI():
 
         return doc.status == 'FS_OK'
 
-    async def handle_text(self, item):
+    async def handle_text(self, item: str) -> Optional[str]:
         """Helper method for fetching a text value."""
         doc = await self.handle_get(item)
         if doc is None:
             return None
 
-        return doc.value.c8_array.text or None
+        return str(doc.value.c8_array.text) or None
 
-    async def handle_int(self, item):
+    async def handle_int(self, item: str) -> Optional[int]:
         """Helper method for fetching a integer value."""
         doc = await self.handle_get(item)
         if doc is None:
@@ -154,7 +165,7 @@ class AFSAPI():
         return int(doc.value.u8.text)
 
     # returns an int, assuming the value does not exceed 8 bits
-    async def handle_long(self, item):
+    async def handle_long(self, item: str) -> Optional[int]:
         """Helper method for fetching a long value. Result is integer."""
         doc = await self.handle_get(item)
         if doc is None:
@@ -162,11 +173,11 @@ class AFSAPI():
 
         return int(doc.value.u32.text)
 
-    async def handle_list(self, item):
+    async def handle_list(self, item: str) \
+            -> List[Dict[str, Optional[DataItem]]]:
         """Helper method for fetching a list(map) value."""
-        doc = await self.call('LIST_GET_NEXT/' + item + '/-1', dict(
-            maxItems=100,
-        ))
+        doc = await self.call('LIST_GET_NEXT/' + item + '/-1',
+                              dict(maxItems=100))
 
         if doc is None:
             return []
@@ -183,7 +194,8 @@ class AFSAPI():
 
         return ret
 
-    async def collect_labels(self, items):
+    async def collect_labels(self, items: Optional[List[Dict[str, Any]]]) \
+            -> List[str]:
         """Helper methods for extracting the labels from a list with maps."""
         if items is None:
             return []
@@ -193,26 +205,26 @@ class AFSAPI():
     # API implementation starts here
 
     # sys
-    async def get_friendly_name(self):
+    async def get_friendly_name(self) -> Optional[str]:
         """Get the friendly name of the device."""
         return await self.handle_text(self.API.get('friendly_name'))
 
-    async def set_friendly_name(self, value):
+    async def set_friendly_name(self, value: str) -> Optional[bool]:
         """Set the friendly name of the device."""
         return await self.handle_set(self.API.get('friendly_name'), value)
 
-    async def get_power(self):
+    async def get_power(self) -> Optional[bool]:
         """Check if the device is on."""
         power = await self.handle_int(self.API.get('power'))
         return bool(power)
 
-    async def set_power(self, value=False):
+    async def set_power(self, value: bool = False) -> Optional[bool]:
         """Power on or off the device."""
         power = await self.handle_set(
             self.API.get('power'), int(value))
         return bool(power)
 
-    async def get_modes(self):
+    async def get_modes(self) -> List[Dict[str, Optional[DataItem]]]:
         """Get the modes supported by this device."""
         if not self.__modes:
             self.__modes = await self.handle_list(
@@ -220,12 +232,12 @@ class AFSAPI():
 
         return self.__modes
 
-    async def get_mode_list(self):
+    async def get_mode_list(self) -> List[str]:
         """Get the label list of the supported modes."""
         self.__modes = await self.get_modes()
         return await self.collect_labels(self.__modes)
 
-    async def get_mode(self):
+    async def get_mode(self) -> Optional[str]:
         """Get the currently active mode on the device (DAB, FM, Spotify)."""
         mode = None
         int_mode = (await self.handle_long(self.API.get('mode')))
@@ -236,7 +248,7 @@ class AFSAPI():
 
         return str(mode)
 
-    async def set_mode(self, value):
+    async def set_mode(self, value: str) -> Optional[bool]:
         """Set the currently active mode on the device (DAB, FM, Spotify)."""
         mode = -1
         modes = await self.get_modes()
@@ -246,7 +258,7 @@ class AFSAPI():
 
         return await self.handle_set(self.API.get('mode'), mode)
 
-    async def get_volume_steps(self):
+    async def get_volume_steps(self) -> Optional[int]:
         """Read the maximum volume level of the device."""
         if not self.__volume_steps:
             self.__volume_steps = await self.handle_int(
@@ -255,57 +267,57 @@ class AFSAPI():
         return self.__volume_steps
 
     # Volume
-    async def get_volume(self):
+    async def get_volume(self) -> Optional[int]:
         """Read the volume level of the device."""
         return await self.handle_int(self.API.get('volume'))
 
-    async def set_volume(self, value):
+    async def set_volume(self, value: int) -> Optional[bool]:
         """Set the volume level of the device."""
         return await self.handle_set(self.API.get('volume'), value)
 
     # Mute
-    async def get_mute(self):
+    async def get_mute(self) -> Optional[bool]:
         """Check if the device is muted."""
         mute = await self.handle_int(self.API.get('mute'))
         return bool(mute)
 
-    async def set_mute(self, value=False):
+    async def set_mute(self, value: bool = False) -> Optional[bool]:
         """Mute or unmute the device."""
         mute = await self.handle_set(self.API.get('mute'), int(value))
         return bool(mute)
 
-    async def get_play_status(self):
+    async def get_play_status(self) -> Optional[str]:
         """Get the play status of the device."""
         status = await self.handle_int(self.API.get('status'))
         return self.PLAY_STATES.get(status)
 
-    async def get_play_name(self):
+    async def get_play_name(self) -> Optional[str]:
         """Get the name of the played item."""
         return await self.handle_text(self.API.get('name'))
 
-    async def get_play_text(self):
+    async def get_play_text(self) -> Optional[str]:
         """Get the text associated with the played media."""
         return await self.handle_text(self.API.get('text'))
 
-    async def get_play_artist(self):
+    async def get_play_artist(self) -> Optional[str]:
         """Get the artists of the current media(song)."""
         return await self.handle_text(self.API.get('artist'))
 
-    async def get_play_album(self):
+    async def get_play_album(self) -> Optional[str]:
         """Get the songs's album."""
         return await self.handle_text(self.API.get('album'))
 
-    async def get_play_graphic(self):
+    async def get_play_graphic(self) -> Optional[str]:
         """Get the album art associated with the song/album/artist."""
         return await self.handle_text(self.API.get('graphic_uri'))
 
-    async def get_play_duration(self):
+    async def get_play_duration(self) -> Optional[int]:
         """Get the duration of the played media."""
         return await self.handle_long(self.API.get('duration'))
 
     # play controls
 
-    async def play_control(self, value):
+    async def play_control(self, value: int) -> Optional[bool]:
         """
         Control the player of the device.
 
@@ -313,23 +325,23 @@ class AFSAPI():
         """
         return await self.handle_set(self.API.get('control'), value)
 
-    async def play(self):
+    async def play(self) -> Optional[bool]:
         """Play media."""
         return await self.play_control(1)
 
-    async def pause(self):
+    async def pause(self) -> Optional[bool]:
         """Pause playing."""
         return await self.play_control(2)
 
-    async def forward(self):
+    async def forward(self) -> Optional[bool]:
         """Next media."""
         return await self.play_control(3)
 
-    async def rewind(self):
+    async def rewind(self) -> Optional[bool]:
         """Previous media."""
         return await self.play_control(4)
 
-    async def get_equalisers(self):
+    async def get_equalisers(self) -> List[str]:
         """Get the equaliser modes supported by this device."""
         if not self.__equalisers:
             self.__equalisers = await self.handle_list(
@@ -337,16 +349,16 @@ class AFSAPI():
 
         return self.__equalisers
 
-    async def get_equaliser_list(self):
+    async def get_equaliser_list(self) -> List[str]:
         """Get the label list of the supported modes."""
         self.__equalisers = await self.get_equalisers()
         return await self.collect_labels(self.__equalisers)
 
     # Sleep
-    async def get_sleep(self):
+    async def get_sleep(self) -> Optional[int]:
         """Check when and if the device is going to sleep."""
         return await self.handle_long(self.API.get('sleep'))
 
-    async def set_sleep(self, value=False):
+    async def set_sleep(self, value: bool = False) -> Optional[bool]:
         """Set device sleep timer."""
         return await self.handle_set(self.API.get('sleep'), int(value))
