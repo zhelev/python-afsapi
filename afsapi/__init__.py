@@ -48,6 +48,9 @@ class AFSAPI():
         'album': 'netRemote.play.info.album',
         'graphic_uri': 'netRemote.play.info.graphicUri',
         'duration': 'netRemote.play.info.duration',
+        # nav
+        'nav': 'netremote.nav.state',
+        'preset': 'netremote.nav.action.selectPreset',
     }
 
     def __init__(self, fsapi_device_url, pin, timeout=DEFAULT_TIMEOUT_IN_SECONDS):
@@ -394,3 +397,16 @@ class AFSAPI():
     def set_sleep(self, value=False):
         """Set device sleep timer."""
         return (yield from self.handle_set(self.API.get('sleep'), int(value)))
+
+    # Nav
+    @asyncio.coroutine
+    def set_preset(self, preset):
+        """Select preset."""
+        nav = (yield from self.handle_set(self.API.get('nav'), 1))
+        if not nav:
+            return False
+        ok = (yield from self.handle_set(self.API.get('preset'), preset))
+        nav = (yield from self.handle_set(self.API.get('nav'), 0))
+
+        return ok
+
