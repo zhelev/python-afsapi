@@ -50,7 +50,8 @@ class AFSAPI():
         'duration': 'netRemote.play.info.duration',
         # nav
         'nav': 'netremote.nav.state',
-        'preset': 'netremote.nav.action.selectPreset',
+        'presets': 'netRemote.nav.presets',
+        'select_preset': 'netRemote.nav.action.selectPreset',
     }
 
     def __init__(self, fsapi_device_url, pin, timeout=DEFAULT_TIMEOUT_IN_SECONDS):
@@ -405,8 +406,30 @@ class AFSAPI():
         nav = (yield from self.handle_set(self.API.get('nav'), 1))
         if not nav:
             return False
-        ok = (yield from self.handle_set(self.API.get('preset'), preset))
+        ok = (yield from self.handle_set(self.API.get('select_preset'), preset))
         nav = (yield from self.handle_set(self.API.get('nav'), 0))
 
         return ok
+
+    @asyncio.coroutine
+    def get_presets(self):
+        """Get the channel presets from the device."""
+        nav = (yield from self.handle_set(self.API.get('nav'), 1))
+        if not nav:
+            return False
+        presets = (yield from self.handle_list(self.API.get('presets')))
+        nav = (yield from self.handle_set(self.API.get('nav'), 0))
+
+        results = []
+        for preset in presets:
+            if 'name' in preset and preset['name'].text:
+                results.append({**preset, **{'label': preset['name'].text.strip()}})
+        
+        return results
+
+    @asyncio.coroutine
+    def get_preset_list(self):
+        """Get the label list of presets."""
+        presets = (yield from self.get_presets())
+        return (yield from self.collect_labels(presets))
 
