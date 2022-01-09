@@ -7,7 +7,6 @@ PACKAGES = find_packages(exclude=['tests', 'tests.*'])
 
 REQUIRES = [
     'aiohttp>=3.3.2',
-    'lxml>=3.6.0'
 ]
 
 PROJECT_CLASSIFIERS = [
@@ -26,7 +25,7 @@ PROJECT_CLASSIFIERS = [
 ]
 
 setup(name='afsapi',
-      version='0.0.5',
+      version='0.1.0',
       description='Asynchronous Implementation of the Frontier Silicon API',
       author='Krasimir Zhelev',
       author_email='krasimir.zhelev@gmail.com',
