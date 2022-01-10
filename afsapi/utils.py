@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 def unpack_xml(root: t.Optional[ET.Element], key: str) -> t.Optional[str]:
     if root:
         element = root.find(key)
-        if hasattr(element, "text"):
+        if hasattr(element, "text") and element.text is not None:
             return str(element.text)  # type: ignore
     return None
 
