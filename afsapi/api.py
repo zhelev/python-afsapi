@@ -37,19 +37,12 @@ READ_WRITE = True
 
 # implemented API calls
 API = {
-    # # sys
-    # "power": ("netRemote.sys.power", FSApiValueType.BOOL, READ_WRITE),
-    # "mode": ("netRemote.sys.mode", FSApiValueType.TEXT, READ_WRITE),
-    # # sys.info
-    # "friendly_name": ("netRemote.sys.info.friendlyName",FSApiValueType.TEXT, READ_WRITE),
-    # "radio_id": ("netRemote.sys.info.radio_id",FSApiValueType.TEXT, READ_ONLY),
-    # "version": ("netRemote.sys.info.version",FSApiValueType.TEXT, READ_ONLY),
     # sys
     "power": "netRemote.sys.power",
     "mode": "netRemote.sys.mode",
     # sys.info
     "friendly_name": "netRemote.sys.info.friendlyName",
-    "radio_id": "netRemote.sys.info.radio_id",
+    "radio_id": "netRemote.sys.info.radioId",
     "version": "netRemote.sys.info.version",
     # sys.caps
     "valid_modes": "netRemote.sys.caps.validModes",

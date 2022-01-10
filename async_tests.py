@@ -97,6 +97,9 @@ async def test_info():
         power = await afsapi.get_power()
         print('Power on: %s' % power)
 
+        
+        print(f"Radio ID: {await afsapi.get_radio_id()}")
+
         name = await afsapi.get_play_name()
         print('Name: %s' % name)
 
@@ -115,11 +118,11 @@ async def test_info():
         duration = await afsapi.get_play_duration()
         print('Duration: %s' % duration)
 
-        power = await afsapi.set_power(False)
-        print('Set power succeeded? - %s' % set_power)
+        #power = await afsapi.set_power(False)
+        #print('Set power succeeded? - %s' % set_power)
 
-        power = await afsapi.get_power()
-        print('Power on: %s' % power)
+        #power = await afsapi.get_power()
+        #print('Power on: %s' % power)
     except Exception:
         logging.error(traceback.format_exc())
 
@@ -149,8 +152,8 @@ async def test_play():
 
 loop = asyncio.new_event_loop()
 
-loop.run_until_complete(test_sys())
-loop.run_until_complete(test_volume())
-loop.run_until_complete(test_play())
+# loop.run_until_complete(test_sys())
+# loop.run_until_complete(test_volume())
+# loop.run_until_complete(test_play())
 loop.run_until_complete(test_info())
 
