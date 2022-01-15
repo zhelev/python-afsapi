@@ -535,9 +535,9 @@ class AFSAPI:
 
         raise FSApiException(f"Could not retrieve mode {int_mode} in modes list")
 
-    def mode(self, value: t.Union[PlayerMode, str]) -> t.Optional[bool]:
+    async def set_mode(self, value: t.Union[PlayerMode, str]) -> t.Optional[bool]:
         """Set the currently active mode on the device (DAB, FM, Spotify)."""
-        return self.handle_set(
+        return await self.handle_set(
             API["mode"], value.key if isinstance(value, PlayerMode) else value
         )
 
