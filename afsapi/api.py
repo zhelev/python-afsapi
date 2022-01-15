@@ -88,25 +88,16 @@ class AFSAPI:
 
         self.sid: t.Optional[str] = None
         self.__volume_steps: t.Optional[int] = None
-        self.__equalisers: t.Optional[t.List[str]] = None
 
-        # # generate API functions from API dict
-
-        # for name, (item, value_type, writeable) in API.items():
-
-        #     async def _getter(self):
-        #         return unpack_xml(await self.handle_get(item), f"value/{VALUE_TYPE_TO_XML_PATH[value_type]}")
-
-        #     setattr(self, f"get_{name}", _getter)
-
-        #     if writeable == READ_WRITE:
-        #         async def _setter(self, value):
+        self.__modes = None
+        self.__equalisers = None
 
     @staticmethod
     async def __get_fsapi_endpoint(fsapi_device_url: str, timeout: int):
 
         async with aiohttp.ClientSession(
-           connector=aiohttp.TCPConnector(force_close=True), timeout=aiohttp.ClientTimeout(total=timeout)
+            connector=aiohttp.TCPConnector(force_close=True),
+            timeout=aiohttp.ClientTimeout(total=timeout),
         ) as client:
             try:
                 resp = await client.get(fsapi_device_url)
@@ -124,8 +115,8 @@ class AFSAPI:
                 raise FSApiException(
                     f"Did not get a response in time from {fsapi_device_url}"
                 )
-            except aiohttp.ClientResponseError:
-                raise FSApiException(f"Could not connect to {fsapi_device_url}")
+            except aiohttp.ClientConnectionError:
+                raise ConnectionError(f"Could not connect to {fsapi_device_url}")
 
     @staticmethod
     async def create(
@@ -165,46 +156,54 @@ class AFSAPI:
             params.update(**extra)
 
         async with aiohttp.ClientSession(
-            connector=aiohttp.TCPConnector(force_close=True), timeout=aiohttp.ClientTimeout(total=self.timeout)
+            connector=aiohttp.TCPConnector(force_close=True),
+            timeout=aiohttp.ClientTimeout(total=self.timeout),
         ) as client:
-            result = await client.get(f"{self.webfsapi_endpoint}/{path}", params=params)
+            try:
+                result = await client.get(f"{self.webfsapi_endpoint}/{path}", params=params)
 
-            if result.status == 403:
-                raise FSApiException("Access denied - incorrect PIN")
-            elif result.status == 404:
-                # Bad session ID or service endpoint
-                logging.warn(f"Service call failed with 404 to {self.webfsapi_endpoint}/{path}")
-
-                if with_session and not force_new_session:
-                    # retry command with a forced new session
-                    return await self.__call(
-                        path, extra, with_session=True, force_new_session=True
+                if result.status == 403:
+                    raise FSApiException("Access denied - incorrect PIN")
+                elif result.status == 404:
+                    # Bad session ID or service endpoint
+                    logging.warn(
+                        f"Service call failed with 404 to {self.webfsapi_endpoint}/{path}"
                     )
-                else:
-                    raise InvalidSessionException("Wrong session-id or invalid command")
-            elif result.status != 200:
-                raise FSApiException(f"Unexpected result {result.status}: {await result.text()}")
 
-            doc = ET.fromstring(await result.text(encoding="utf-8"))
-            status = unpack_xml(doc, "status")
+                    if with_session and not force_new_session:
+                        # retry command with a forced new session
+                        return await self.__call(
+                            path, extra, with_session=True, force_new_session=True
+                        )
+                    else:
+                        raise InvalidSessionException("Wrong session-id or invalid command")
+                elif result.status != 200:
+                    raise FSApiException(
+                        f"Unexpected result {result.status}: {await result.text()}"
+                    )
 
-            if status == "FS_OK" or status == "FS_LIST_END":
-                return doc
-            elif status == "FS_NODE_DOES_NOT_EXIST":
-                raise FSApiException(
-                    f"FSAPI service {path} not implemented at {self.webfsapi_endpoint}."
-                )
-            elif status == "FS_NODE_BLOCKED":
-                raise FSApiException("Device is not in the correct mode")
-            elif status == "FS_FAIL":
-                raise OutOfRangeException(
-                    "Command failed. Value is not in range for this command."
-                )
-            elif status == "FS_PACKET_BAD":
-                raise FSApiException("This command can't be SET")
+                doc = ET.fromstring(await result.text(encoding="utf-8"))
+                status = unpack_xml(doc, "status")
 
-            logging.error(f"Unexpected FSAPI status {status}")
-            raise FSApiException("Unexpected FSAPI status")
+                if status == "FS_OK" or status == "FS_LIST_END":
+                    return doc
+                elif status == "FS_NODE_DOES_NOT_EXIST":
+                    raise FSApiException(
+                        f"FSAPI service {path} not implemented at {self.webfsapi_endpoint}."
+                    )
+                elif status == "FS_NODE_BLOCKED":
+                    raise FSApiException("Device is not in the correct mode")
+                elif status == "FS_FAIL":
+                    raise OutOfRangeException(
+                        "Command failed. Value is not in range for this command."
+                    )
+                elif status == "FS_PACKET_BAD":
+                    raise FSApiException("This command can't be SET")
+
+                logging.error(f"Unexpected FSAPI status {status}")
+                raise FSApiException(f"Unexpected FSAPI status '{status}'")
+            except aiohttp.ClientConnectionError:
+                raise ConnectionError(f"Could not connect to {self.webfsapi_endpoint}")
 
     # Helper methods
 
@@ -287,7 +286,6 @@ class AFSAPI:
             start += count
             has_next = len(items) == count
 
-
     # sys
     async def get_friendly_name(self) -> t.Optional[str]:
         """Get the friendly name of the device."""
@@ -315,7 +313,6 @@ class AFSAPI:
         power = await self.handle_set(API["power"], int(value))
         return bool(power)
 
- 
     async def get_volume_steps(self) -> t.Optional[int]:
         """Read the maximum volume level of the device."""
         if not self.__volume_steps:
@@ -368,7 +365,6 @@ class AFSAPI:
         """Get the album art associated with the song/album/artist."""
         return await self.handle_text(API["graphic_uri"])
 
-
     # Shuffle
     async def get_play_shuffle(self) -> t.Optional[bool]:
         status = await self.handle_int("netRemote.play.shuffle")
@@ -395,7 +391,7 @@ class AFSAPI:
 
     async def get_play_position(self) -> t.Optional[int]:
         """
-        The user can jump to a specific moment of the track. This means that the range of the value is 
+        The user can jump to a specific moment of the track. This means that the range of the value is
         different with every track.
         After the position is changed, the music player will continue to play the song (with the same rate).
 
@@ -406,14 +402,12 @@ class AFSAPI:
     async def set_play_position(self, value: int):
         return await self.handle_set("netRemote.play.position", value)
 
-
-
     # Play  rate
     async def get_play_rate(self) -> t.Optional[int]:
         """
-        * -127 to -1: When the user sends a negative value, the music player will rewind the track. 
+        * -127 to -1: When the user sends a negative value, the music player will rewind the track.
           The speed depends on the value, -10 will rewind faster than value -2
-        
+
         * 0: When the user send rate = 0, the track will be paused
         * 1: The track will be played with normal speed
         * 2 to 127: The track will be fast forwarded, the speed is here also dependable of the value
@@ -422,7 +416,7 @@ class AFSAPI:
         return await self.handle_int("netRemote.play.rate")
 
     async def set_play_rate(self, value: int):
-        if -127 <= value <= 127: 
+        if -127 <= value <= 127:
             return await self.handle_set("netRemote.play.rate", value)
         else:
             return ValueError("Play rate must be within values -127 to 127")
@@ -455,19 +449,33 @@ class AFSAPI:
 
     async def get_equalisers(self) -> t.List[Equaliser]:
         """Get the equaliser modes supported by this device."""
-        async for key, eqinfo in self.handle_list(API["equalisers"]):
-            yield Equaliser(key=key, **eqinfo)
+
+        # Cache as this never changes
+        if self.__equalisers is None:
+            self.__equalisers = [
+                Equaliser(key=key, **eqinfo)
+                async for key, eqinfo in self.handle_list(API["equalisers"])
+            ]
+
+        return self.__equalisers
 
     # EQ Presets
-    async def get_eq_preset(self) -> t.Optional[EQPreset]:
+    async def get_eq_preset(self) -> t.Optional[Equaliser]:
         v = await self.handle_int("netRemote.sys.audio.eqpreset")
-        if v:
-            return EQPreset(v)
-        return None
+        if not v:
+            return None
 
-    async def set_eq_preset(self, value: t.Union[EQPreset, int]) -> t.Optional[bool]:
-        return await self.handle_set("netRemote.sys.audio.eqpreset", int(value))
+        for eq in await self.get_equalisers():
+            if eq.key == str(v):
+                return eq
 
+        raise FSApiException(f"Could not retrieve equaliser {v} in equaliser list")
+
+    async def set_eq_preset(self, value: t.Union[Equaliser, int]) -> t.Optional[bool]:
+        return await self.handle_set(
+            "netRemote.sys.audio.eqpreset",
+            int(value.key) if isinstance(value, Equaliser) else value,
+        )
 
     # EQ Loudness (Only works with My EQ!)
     async def get_eq_loudness(self) -> bool:
@@ -476,51 +484,62 @@ class AFSAPI:
     async def set_eq_loudness(self, value: bool) -> t.Optional[bool]:
         return await self.handle_set("netRemote.sys.audio.eqloudness", int(value))
 
-
     # Bass and Treble
     async def get_bass(self) -> int:
         return await self.handle_int("netRemote.sys.audio.eqcustom.param0")
 
     async def set_bass(self, value: bool) -> t.Optional[bool]:
         if -14 <= value <= 14:
-            return await self.handle_set("netRemote.sys.audio.custom.param0", int(value))
+            return await self.handle_set(
+                "netRemote.sys.audio.custom.param0", int(value)
+            )
         else:
             raise ValueError("Outside of bounds: [-14, 14]")
- 
+
     async def get_treble(self) -> int:
         return await self.handle_int("netRemote.sys.audio.eqcustom.param1")
 
     async def set_treble(self, value: bool) -> t.Optional[bool]:
         if -14 <= value <= 14:
-            return await self.handle_set("netRemote.sys.audio.eqcustom.param1", int(value))
+            return await self.handle_set(
+                "netRemote.sys.audio.eqcustom.param1", int(value)
+            )
         else:
             raise ValueError("Outside of bounds: [-14, 14]")
-    
 
     # Mode
-    async def _get_modes(self)-> t.List[t.Dict[str, t.Optional[DataItem]]]:
+    async def _get_modes(
+        self,
+    ) -> t.Iterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
         async for mode in self.handle_list(API["valid_modes"]):
             yield mode
 
-    async def get_modes(self) -> t.Iterable[PlayerMode]:
+    async def get_modes(self) -> t.List[PlayerMode]:
         """Get the modes supported by this device."""
-        async for k, v in self._get_modes():
-            yield PlayerMode(key=k, **v)
 
-    async def get_mode(self) -> t.Optional[str]:
+        # Cache as this never changes
+        if self.__modes is None:
+            self.__modes = [PlayerMode(key=k, **v) async for k, v in self._get_modes()]
+
+        return self.__modes
+
+    async def get_mode(self) -> t.Optional[PlayerMode]:
         """Get the currently active mode on the device (DAB, FM, Spotify)."""
         int_mode = await self.handle_long(API["mode"])
-        if int_mode is not None:
-            async for mode in self.get_modes():
-                if mode.key == str(int_mode):
-                    return mode
-        
+        if int_mode is None:
+            return None
+
+        for mode in await self.get_modes():
+            if mode.key == str(int_mode):
+                return mode
+
         raise FSApiException(f"Could not retrieve mode {int_mode} in modes list")
 
     def mode(self, value: t.Union[PlayerMode, str]) -> t.Optional[bool]:
         """Set the currently active mode on the device (DAB, FM, Spotify)."""
-        return self.handle_set(API["mode"], value.key if isinstance(value, PlayerMode) else value)
-
+        return self.handle_set(
+            API["mode"], value.key if isinstance(value, PlayerMode) else value
+        )
 
     # Sleep
     async def get_sleep(self) -> t.Optional[int]:
@@ -531,21 +550,13 @@ class AFSAPI:
         """Set device sleep timer."""
         return await self.handle_set(API["sleep"], int(value))
 
+    # Folder navigation
 
     async def _enable_nav_if_necessary(self):
 
         nav_state = await self.handle_int("netRemote.nav.state")
         if nav_state != 1:
             await self.handle_set("netRemote.nav.state", 1)
-
-
-    # Folder navigation
-
-    async def _enable_nav_if_necessary(self):
-
-        nav_state = self.handle_int("netRemote.nav.state")
-        if nav_state != 1:
-            self.handle_set("netRemote.nav.state", 1)
 
     async def nav_get_numitems(self) -> t.Optional[int]:
         await self._enable_nav_if_necessary()
@@ -555,7 +566,7 @@ class AFSAPI:
         await self._enable_nav_if_necessary()
         return await self.handle_list("netRemote.nav.list")
 
-    async def nav_select_folder(self,value:int ):
+    async def nav_select_folder(self, value: int):
         await self._enable_nav_if_necessary()
         await self.handle_set("netRemote.nav.action.navigate", value)
 
@@ -563,24 +574,36 @@ class AFSAPI:
         await self._enable_nav_if_necessary()
         await self.handle_set("netRemote.nav.action.navigate", "0xffffffff")
 
-
     async def nav_select_item(self, value: int):
         await self._enable_nav_if_necessary()
         await self.handle_set("netRemote.nav.action.selectItem", value)
 
-
     # Presets
 
-    async def _get_presets(self) -> t.Iterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
-        self._enable_nav_if_necessary()
-        return self.handle_list("netRemote.nav.presets")
-    
-    @property
-    async def presets(self):
-        async for key, preset_fields in self._get_presets():
-            if preset_fields.get("type"):
-                yield Preset(key=int(key),**preset_fields)
-    
+    async def _get_presets(
+        self,
+    ) -> t.Iterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
+        await self._enable_nav_if_necessary()
+
+        async for key, preset in self.handle_list("netRemote.nav.presets"):
+            if preset.get("name"):
+                # Strip whitespaces from names
+                preset["name"]  = preset["name"].strip()
+                yield key, preset
+            else:
+                # Skip empty preset
+                pass
+
+    async def get_presets(self) -> t.List[Preset]:
+
+        # We don't cache this call as it changes when the mode changes
+
+        return [Preset(key=int(key), **preset_fields)
+        async for key, preset_fields in self._get_presets()]
+
     async def select_preset(self, value: t.Union[Preset, int]):
-        self._enable_nav_if_necessary()
-        return await self.handle_set("netRemote.nav.action.selectPreset", value.key if isinstance(value, Preset) else value)
+        await self._enable_nav_if_necessary()
+        return await self.handle_set(
+            "netRemote.nav.action.selectPreset",
+            value.key if isinstance(value, Preset) else value,
+        )

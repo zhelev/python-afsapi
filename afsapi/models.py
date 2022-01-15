@@ -25,17 +25,6 @@ class PlayControl(IntEnum):
     """
 
 
-class EQPreset(IntEnum):
-    MY_EQ = 0
-    NORMAL = 1
-    FLAT = 2
-    JAZZ = 3
-    ROCK = 4
-    MOVIE = 5
-    CLASSIC = 6
-    POP = 7
-    NEWS = 8
-
 
 @dataclass
 class PlayerMode:

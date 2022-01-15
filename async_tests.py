@@ -5,7 +5,7 @@ import logging
 
 from afsapi import AFSAPI
 
-URL = 'http://192.168.1.183:80/device'
+URL = 'http://192.168.1.182:80/device'
 PIN = 1234
 TIMEOUT = 2  # in seconds
 
@@ -27,10 +27,10 @@ async def test_sys():
         friendly_name = await afsapi.get_friendly_name()
         print('Friendly name: %s' % friendly_name)
 
-        async for mode in afsapi.get_modes():
+        for mode in await afsapi.get_modes():
             print('Mode: %s' % mode)
 
-        async for equaliser in afsapi.get_equalisers():
+        for equaliser in await afsapi.get_equalisers():
             print('Equaliser: %s' % equaliser)
 
         eqp = await afsapi.get_eq_preset()
@@ -38,6 +38,9 @@ async def test_sys():
 
         mode = await afsapi.get_mode()
         print('Mode: %s' % mode)
+
+        for preset in await afsapi.get_presets():
+            print(f"Preset: {preset}")
 
         power = await afsapi.set_power(False)
         print('Set power succeeded? - %s' % set_power)
@@ -99,6 +102,7 @@ async def test_info():
 
         
         print(f"Radio ID: {await afsapi.get_radio_id()}")
+        print(f"Version: {await afsapi.get_version()}")
 
         name = await afsapi.get_play_name()
         print('Name: %s' % name)
@@ -152,8 +156,8 @@ async def test_play():
 
 loop = asyncio.new_event_loop()
 
-# loop.run_until_complete(test_sys())
-# loop.run_until_complete(test_volume())
-# loop.run_until_complete(test_play())
+loop.run_until_complete(test_sys())
+loop.run_until_complete(test_volume())
+loop.run_until_complete(test_play())
 loop.run_until_complete(test_info())
 

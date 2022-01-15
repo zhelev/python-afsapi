@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 PACKAGES = find_packages(exclude=['tests', 'tests.*'])
 
 REQUIRES = [
-    'aiohttp>=3.3.2',
+    'aiohttp>=3.3.2,<4',
 ]
 
 PROJECT_CLASSIFIERS = [
