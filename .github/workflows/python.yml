@@ -19,23 +19,23 @@ jobs:
       - name: flake8 Lint
         uses: py-actions/flake8@v2
         with:
-          ignore: "F401"
           max-line-length: "120"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  # mypy:
-  #   runs-on: ubuntu-latest
-  #   name: Mypy
-  #   steps:
-  #     - uses: actions/checkout@v1
-  #     - name: Set up Python 3.8
-  #       uses: actions/setup-python@v1
-  #       with:
-  #         python-version: 3.8
-  #     - name: Install Mypy
-  #       run: |
-  #         pip install mypy
-  #     - name: mypy
-  #       run: |
-  #         mypy --strict afsapi/
+
+# mypy:
+#   runs-on: ubuntu-latest
+#   name: Mypy
+#   steps:
+#     - uses: actions/checkout@v1
+#     - name: Set up Python 3.8
+#       uses: actions/setup-python@v1
+#       with:
+#         python-version: 3.8
+#     - name: Install Mypy
+#       run: |
+#         pip install mypy
+#     - name: mypy
+#       run: |
+#         mypy --strict afsapi/
 ...

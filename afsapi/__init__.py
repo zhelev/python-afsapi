@@ -1,6 +1,6 @@
-from .api import AFSAPI
-from .models import *
-from .exceptions import *
+from .api import AFSAPI     # noqa
+from .models import *       # noqa
+from .exceptions import *   # noqa
 
 from importlib.metadata import version, PackageNotFoundError
 try:
