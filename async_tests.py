@@ -5,7 +5,7 @@ import logging
 
 from afsapi import AFSAPI
 
-URL = 'http://192.168.1.182:80/device'
+URL = 'http://192.168.1.183:80/device'
 PIN = 1234
 TIMEOUT = 2  # in seconds
 

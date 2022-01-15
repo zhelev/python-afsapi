@@ -93,7 +93,7 @@ class AFSAPI:
         self.__equalisers = None
 
     @staticmethod
-    async def __get_fsapi_endpoint(fsapi_device_url: str, timeout: int):
+    async def get_webfsapi_endpoint(fsapi_device_url: str, timeout: int):
 
         async with aiohttp.ClientSession(
             connector=aiohttp.TCPConnector(force_close=True),
@@ -125,7 +125,7 @@ class AFSAPI:
         force_with_session=False,
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
     ):
-        webfsapi_endpoint = await AFSAPI.__get_fsapi_endpoint(fsapi_device_url, timeout)
+        webfsapi_endpoint = await AFSAPI.get_webfsapi_endpoint(fsapi_device_url, timeout)
 
         return AFSAPI(webfsapi_endpoint, pin, force_with_session, timeout)
 
