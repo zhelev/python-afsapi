@@ -6,13 +6,12 @@ For example internet radios from: Medion, Hama, Auna, ...
 
 import typing as t
 import logging
-import traceback
 from afsapi.exceptions import (
     FSApiException,
     InvalidSessionException,
     OutOfRangeException,
 )
-from afsapi.models import *
+from afsapi.models import Preset, Equaliser, PlayerMode, PlayControl, PlayState
 from afsapi.utils import unpack_xml, maybe
 from enum import Enum
 import aiohttp
@@ -48,7 +47,7 @@ API = {
     "valid_modes": "netRemote.sys.caps.validModes",
     "equalisers": "netRemote.sys.caps.eqPresets",
     "sleep": "netRemote.sys.sleep",
-    #sys.audio
+    # sys.audio
     "eqpreset": "netRemote.sys.audio.eqpreset",
     "eqloudness": "netRemote.sys.audio.eqloudness",
     "bass": "netRemote.sys.audio.eqcustom.param0",
@@ -71,7 +70,6 @@ API = {
     "album": "netRemote.play.info.album",
     "graphic_uri": "netRemote.play.info.graphicUri",
     "duration": "netRemote.play.info.duration",
-
     # nav
     "nav_state": "netRemote.nav.state",
     "numitems": "netRemote.nav.numitems",
@@ -79,10 +77,12 @@ API = {
     "navigate": "netRemote.nav.action.navigate",
     "selectItem": "netRemote.nav.action.selectItem",
     "presets": "netRemote.nav.presets",
-    "selectPreset": "netRemote.nav.action.selectPreset"
+    "selectPreset": "netRemote.nav.action.selectPreset",
 }
 
 # pylint: disable=R0904
+
+
 class AFSAPI:
     """Builds the interface to a Frontier Silicon device."""
 
@@ -111,7 +111,9 @@ class AFSAPI:
         self.__equalisers = None
 
     @staticmethod
-    async def get_webfsapi_endpoint(fsapi_device_url: str, timeout: int = DEFAULT_TIMEOUT_IN_SECONDS):
+    async def get_webfsapi_endpoint(
+        fsapi_device_url: str, timeout: int = DEFAULT_TIMEOUT_IN_SECONDS
+    ):
 
         async with aiohttp.ClientSession(
             connector=aiohttp.TCPConnector(force_close=True),
@@ -134,7 +136,8 @@ class AFSAPI:
                     f"Did not get a response in time from {fsapi_device_url}"
                 )
             except aiohttp.ClientConnectionError:
-                raise ConnectionError(f"Could not connect to {fsapi_device_url}")
+                raise ConnectionError(
+                    f"Could not connect to {fsapi_device_url}")
 
     @staticmethod
     async def create(
@@ -143,7 +146,9 @@ class AFSAPI:
         force_with_session=False,
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
     ):
-        webfsapi_endpoint = await AFSAPI.get_webfsapi_endpoint(fsapi_device_url, timeout)
+        webfsapi_endpoint = await AFSAPI.get_webfsapi_endpoint(
+            fsapi_device_url, timeout
+        )
 
         return AFSAPI(webfsapi_endpoint, pin, force_with_session, timeout)
 
@@ -178,7 +183,9 @@ class AFSAPI:
             timeout=aiohttp.ClientTimeout(total=self.timeout),
         ) as client:
             try:
-                result = await client.get(f"{self.webfsapi_endpoint}/{path}", params=params)
+                result = await client.get(
+                    f"{self.webfsapi_endpoint}/{path}", params=params
+                )
 
                 if result.status == 403:
                     raise FSApiException("Access denied - incorrect PIN")
@@ -194,7 +201,9 @@ class AFSAPI:
                             path, extra, with_session=True, force_new_session=True
                         )
                     else:
-                        raise InvalidSessionException("Wrong session-id or invalid command")
+                        raise InvalidSessionException(
+                            "Wrong session-id or invalid command"
+                        )
                 elif result.status != 200:
                     raise FSApiException(
                         f"Unexpected result {result.status}: {await result.text()}"
@@ -221,7 +230,8 @@ class AFSAPI:
                 logging.error(f"Unexpected FSAPI status {status}")
                 raise FSApiException(f"Unexpected FSAPI status '{status}'")
             except aiohttp.ClientConnectionError:
-                raise ConnectionError(f"Could not connect to {self.webfsapi_endpoint}")
+                raise ConnectionError(
+                    f"Could not connect to {self.webfsapi_endpoint}")
 
     # Helper methods
 
@@ -487,7 +497,8 @@ class AFSAPI:
             if eq.key == str(v):
                 return eq
 
-        raise FSApiException(f"Could not retrieve equaliser {v} in equaliser list")
+        raise FSApiException(
+            f"Could not retrieve equaliser {v} in equaliser list")
 
     async def set_eq_preset(self, value: t.Union[Equaliser, int]) -> t.Optional[bool]:
         return await self.handle_set(
@@ -508,9 +519,7 @@ class AFSAPI:
 
     async def set_bass(self, value: bool) -> t.Optional[bool]:
         if -14 <= value <= 14:
-            return await self.handle_set(
-                API["bass"], int(value)
-            )
+            return await self.handle_set(API["bass"], int(value))
         else:
             raise ValueError("Outside of bounds: [-14, 14]")
 
@@ -519,9 +528,7 @@ class AFSAPI:
 
     async def set_treble(self, value: bool) -> t.Optional[bool]:
         if -14 <= value <= 14:
-            return await self.handle_set(
-                API["treble"], int(value)
-            )
+            return await self.handle_set(API["treble"], int(value))
         else:
             raise ValueError("Outside of bounds: [-14, 14]")
 
@@ -551,7 +558,8 @@ class AFSAPI:
             if mode.key == str(int_mode):
                 return mode
 
-        raise FSApiException(f"Could not retrieve mode {int_mode} in modes list")
+        raise FSApiException(
+            f"Could not retrieve mode {int_mode} in modes list")
 
     async def set_mode(self, value: t.Union[PlayerMode, str]) -> t.Optional[bool]:
         """Set the currently active mode on the device (DAB, FM, Spotify)."""
@@ -606,7 +614,7 @@ class AFSAPI:
         async for key, preset in self.handle_list(API["presets"]):
             if preset.get("name"):
                 # Strip whitespaces from names
-                preset["name"]  = preset["name"].strip()
+                preset["name"] = preset["name"].strip()
                 yield key, preset
             else:
                 # Skip empty preset
@@ -616,8 +624,10 @@ class AFSAPI:
 
         # We don't cache this call as it changes when the mode changes
 
-        return [Preset(key=int(key), **preset_fields)
-        async for key, preset_fields in self._get_presets()]
+        return [
+            Preset(key=int(key), **preset_fields)
+            async for key, preset_fields in self._get_presets()
+        ]
 
     async def select_preset(self, value: t.Union[Preset, int]):
         await self._enable_nav_if_necessary()

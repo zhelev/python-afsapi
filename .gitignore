@@ -93,3 +93,5 @@ ENV/
 
 #VS Code
 .vscode
+
+afsapi/version.py

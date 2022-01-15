@@ -25,7 +25,6 @@ class PlayControl(IntEnum):
     """
 
 
-
 @dataclass
 class PlayerMode:
     id: str
@@ -34,6 +33,7 @@ class PlayerMode:
     streamable: int
     modetype: int
     key: str
+
 
 @dataclass
 class Equaliser:

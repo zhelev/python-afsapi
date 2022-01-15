@@ -1,49 +1,5 @@
-"""
-Setup file for the afsapi package
-"""
-from setuptools import setup, find_packages
+#!/usr/bin/env python
+import setuptools
 
-PACKAGES = find_packages(exclude=['tests', 'tests.*'])
-
-REQUIRES = [
-    'aiohttp>=3.3.2,<4',
-]
-
-PROJECT_CLASSIFIERS = [
-    'Intended Audience :: Developers',
-    'License :: OSI Approved :: Apache Software License',
-    'Operating System :: OS Independent',
-    'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.0',
-    'Programming Language :: Python :: 3.1',
-    'Programming Language :: Python :: 3.2',
-    'Programming Language :: Python :: 3.3',
-    'Programming Language :: Python :: 3.4',
-    'Programming Language :: Python :: 3.5',
-    'Programming Language :: Python :: 3.6',
-    'Topic :: Software Development :: Libraries'
-]
-
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
-
-setup(name='afsapi',
-      version='0.2.0',
-      description='Asynchronous Implementation of the Frontier Silicon API',
-      author='Krasimir Zhelev',
-      author_email='krasimir.zhelev@gmail.com',
-      keywords='afsapi async fsapi frontier silicon',
-      license="Apache License 2.0",
-      long_description=long_description,
-      long_description_content_type="text/markdown",
-      download_url='https://github.com/zhelev/python-afsapi/archive/0.2.0.zip',
-      url='https://github.com/zhelev/python-afsapi.git',
-      maintainer='Krasimir Zhelev',
-      maintainer_email='krasimir.zhelev@gmail.com',
-      zip_safe=True,
-      include_package_data=True,
-      packages=PACKAGES,
-      platforms='any',
-      install_requires=REQUIRES,
-      classifiers=PROJECT_CLASSIFIERS,
-      )
+if __name__ == "__main__":
+    setuptools.setup()
