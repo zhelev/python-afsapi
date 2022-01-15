@@ -24,6 +24,9 @@ PROJECT_CLASSIFIERS = [
     'Topic :: Software Development :: Libraries'
 ]
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
 setup(name='afsapi',
       version='0.2.0',
       description='Asynchronous Implementation of the Frontier Silicon API',
@@ -31,6 +34,8 @@ setup(name='afsapi',
       author_email='krasimir.zhelev@gmail.com',
       keywords='afsapi async fsapi frontier silicon',
       license="Apache License 2.0",
+      long_description=long_description,
+      long_description_content_type="text/markdown",
       download_url='https://github.com/zhelev/python-afsapi/archive/0.2.0.zip',
       url='https://github.com/zhelev/python-afsapi.git',
       maintainer='Krasimir Zhelev',

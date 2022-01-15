@@ -15,44 +15,25 @@ async def test_sys():
     try:
         afsapi = await AFSAPI.create(URL, PIN, TIMEOUT)
 
-        set_power = await afsapi.set_power(True)
-        print('Set power succeeded? - %s' % set_power)
-
-        power = await afsapi.get_power()
-        print('Power on: %s' % power)
-
-        set_friendly_name = await afsapi.set_friendly_name('Keuken')
-        print('Set friendly name? - %s' % set_friendly_name)
-
-        friendly_name = await afsapi.get_friendly_name()
-        print('Friendly name: %s' % friendly_name)
-
+        print(f'Set power succeeded? - {await afsapi.set_power(True)}' )
+        print(f'Power on: {await afsapi.get_power()}')
+        print(f'Friendly name: {await afsapi.get_friendly_name()}')
         for mode in await afsapi.get_modes():
-            print('Mode: %s' % mode)
+            print(f'Available Mode: {mode}')
+        print(f'Current Mode: {await afsapi.get_mode()}')
 
         for equaliser in await afsapi.get_equalisers():
-            print('Equaliser: %s' % equaliser)
+            print(f'Equaliser: {equaliser}')
 
-        eqp = await afsapi.get_eq_preset()
-        print('EQ Preset: %s' % eqp)
-
-        mode = await afsapi.get_mode()
-        print('Mode: %s' % mode)
+        print(f'EQ Preset: {await afsapi.get_eq_preset()}' )
 
         for preset in await afsapi.get_presets():
             print(f"Preset: {preset}")
 
-        power = await afsapi.set_power(False)
-        print('Set power succeeded? - %s' % set_power)
-
-        set_sleep = await afsapi.set_sleep(10)
-        print('Set sleep succeeded? - %s' % set_sleep)
-
-        sleep = await afsapi.get_sleep()
-        print('Sleep: %s' % sleep)
-
-        power = await afsapi.get_power()
-        print('Power on: %s' % power)
+        print(f'Set power succeeded? - {await afsapi.set_power(False)}')
+        print(f'Set sleep succeeded? - {await afsapi.set_sleep(10)}')
+        print(f'Sleep: {await afsapi.get_sleep()}')
+        print(f'Get power {await afsapi.get_power()}' )
     except Exception:
         logging.error(traceback.format_exc())
 
