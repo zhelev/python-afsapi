@@ -48,6 +48,11 @@ API = {
     "valid_modes": "netRemote.sys.caps.validModes",
     "equalisers": "netRemote.sys.caps.eqPresets",
     "sleep": "netRemote.sys.sleep",
+    #sys.audio
+    "eqpreset": "netRemote.sys.audio.eqpreset",
+    "eqloudness": "netRemote.sys.audio.eqloudness",
+    "bass": "netRemote.sys.audio.eqcustom.param0",
+    "treble": "netRemote.sys.audio.eqcustom.param1",
     # volume
     "volume_steps": "netRemote.sys.caps.volumeSteps",
     "volume": "netRemote.sys.audio.volume",
@@ -56,12 +61,25 @@ API = {
     "status": "netRemote.play.status",
     "name": "netRemote.play.info.name",
     "control": "netRemote.play.control",
+    "shuffle": "netRemote.play.shuffle",
+    "repeat": "netRemote.play.repeat",
+    "position": "netRemote.play.position",
+    "rate": "netRemote.play.rate",
     # info
     "text": "netRemote.play.info.text",
     "artist": "netRemote.play.info.artist",
     "album": "netRemote.play.info.album",
     "graphic_uri": "netRemote.play.info.graphicUri",
     "duration": "netRemote.play.info.duration",
+
+    # nav
+    "nav_state": "netRemote.nav.state",
+    "numitems": "netRemote.nav.numitems",
+    "nav_list": "netRemote.nav.list",
+    "navigate": "netRemote.nav.action.navigate",
+    "selectItem": "netRemote.nav.action.selectItem",
+    "presets": "netRemote.nav.presets",
+    "selectPreset": "netRemote.nav.action.selectPreset"
 }
 
 # pylint: disable=R0904
@@ -367,23 +385,23 @@ class AFSAPI:
 
     # Shuffle
     async def get_play_shuffle(self) -> t.Optional[bool]:
-        status = await self.handle_int("netRemote.play.shuffle")
+        status = await self.handle_int(API["shuffle"])
         if status:
             return status == 1
         return None
 
     async def set_play_shuffle(self, value: bool):
-        return await self.handle_set("netRemote.play.shuffle", int(value))
+        return await self.handle_set(API["shuffle"], int(value))
 
     # Repeat
     async def get_play_repeat(self) -> t.Optional[bool]:
-        status = await self.handle_int("netRemote.play.repeat")
+        status = await self.handle_int(API["repeat"])
         if status:
             return status == 1
         return None
 
     async def play_repeat(self, value: bool):
-        return await self.handle_set("netRemote.play.repeat", int(value))
+        return await self.handle_set(API["repeat"], int(value))
 
     async def get_play_duration(self) -> t.Optional[int]:
         """Get the duration of the played media."""
@@ -397,10 +415,10 @@ class AFSAPI:
 
         To find the upper bound for the current track, use `get_play_duration`
         """
-        return await self.handle_int("netRemote.play.position")
+        return await self.handle_int(API["position"])
 
     async def set_play_position(self, value: int):
-        return await self.handle_set("netRemote.play.position", value)
+        return await self.handle_set(API["position"], value)
 
     # Play  rate
     async def get_play_rate(self) -> t.Optional[int]:
@@ -413,11 +431,11 @@ class AFSAPI:
         * 2 to 127: The track will be fast forwarded, the speed is here also dependable of the value
           The speed of the fast forward is also dependable of the value, 80 is faster than 10
         """
-        return await self.handle_int("netRemote.play.rate")
+        return await self.handle_int(API["rate"])
 
     async def set_play_rate(self, value: int):
         if -127 <= value <= 127:
-            return await self.handle_set("netRemote.play.rate", value)
+            return await self.handle_set(API["rate"], value)
         else:
             return ValueError("Play rate must be within values -127 to 127")
 
@@ -461,7 +479,7 @@ class AFSAPI:
 
     # EQ Presets
     async def get_eq_preset(self) -> t.Optional[Equaliser]:
-        v = await self.handle_int("netRemote.sys.audio.eqpreset")
+        v = await self.handle_int(API["eqpreset"])
         if not v:
             return None
 
@@ -473,36 +491,36 @@ class AFSAPI:
 
     async def set_eq_preset(self, value: t.Union[Equaliser, int]) -> t.Optional[bool]:
         return await self.handle_set(
-            "netRemote.sys.audio.eqpreset",
+            API["eqpreset"],
             int(value.key) if isinstance(value, Equaliser) else value,
         )
 
     # EQ Loudness (Only works with My EQ!)
     async def get_eq_loudness(self) -> bool:
-        return bool(await self.handle_int("netRemote.sys.audio.eqloudness"))
+        return bool(await self.handle_int(API["eqloudness"]))
 
     async def set_eq_loudness(self, value: bool) -> t.Optional[bool]:
-        return await self.handle_set("netRemote.sys.audio.eqloudness", int(value))
+        return await self.handle_set(API["eqloudness"], int(value))
 
     # Bass and Treble
     async def get_bass(self) -> int:
-        return await self.handle_int("netRemote.sys.audio.eqcustom.param0")
+        return await self.handle_int(API["bass"])
 
     async def set_bass(self, value: bool) -> t.Optional[bool]:
         if -14 <= value <= 14:
             return await self.handle_set(
-                "netRemote.sys.audio.custom.param0", int(value)
+                API["bass"], int(value)
             )
         else:
             raise ValueError("Outside of bounds: [-14, 14]")
 
     async def get_treble(self) -> int:
-        return await self.handle_int("netRemote.sys.audio.eqcustom.param1")
+        return await self.handle_int(API["treble"])
 
     async def set_treble(self, value: bool) -> t.Optional[bool]:
         if -14 <= value <= 14:
             return await self.handle_set(
-                "netRemote.sys.audio.eqcustom.param1", int(value)
+                API["treble"], int(value)
             )
         else:
             raise ValueError("Outside of bounds: [-14, 14]")
@@ -554,29 +572,29 @@ class AFSAPI:
 
     async def _enable_nav_if_necessary(self):
 
-        nav_state = await self.handle_int("netRemote.nav.state")
+        nav_state = await self.handle_int(API["nav_state"])
         if nav_state != 1:
-            await self.handle_set("netRemote.nav.state", 1)
+            await self.handle_set(API["nav_state"], 1)
 
     async def nav_get_numitems(self) -> t.Optional[int]:
         await self._enable_nav_if_necessary()
-        return await self.handle_signed_long("netRemote.nav.numitems")
+        return await self.handle_signed_long(API["numitems"])
 
     async def nav_list(self) -> t.Iterable[t.Tuple[str, t.Dict[str, DataItem]]]:
         await self._enable_nav_if_necessary()
-        return await self.handle_list("netRemote.nav.list")
+        return await self.handle_list(API["nav_list"])
 
     async def nav_select_folder(self, value: int):
         await self._enable_nav_if_necessary()
-        await self.handle_set("netRemote.nav.action.navigate", value)
+        await self.handle_set(API["navigate"], value)
 
     async def nav_select_parent_folder(self):
         await self._enable_nav_if_necessary()
-        await self.handle_set("netRemote.nav.action.navigate", "0xffffffff")
+        await self.handle_set(API["navigate"], "0xffffffff")
 
     async def nav_select_item(self, value: int):
         await self._enable_nav_if_necessary()
-        await self.handle_set("netRemote.nav.action.selectItem", value)
+        await self.handle_set(API["selectItem"], value)
 
     # Presets
 
@@ -585,7 +603,7 @@ class AFSAPI:
     ) -> t.Iterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
         await self._enable_nav_if_necessary()
 
-        async for key, preset in self.handle_list("netRemote.nav.presets"):
+        async for key, preset in self.handle_list(API["presets"]):
             if preset.get("name"):
                 # Strip whitespaces from names
                 preset["name"]  = preset["name"].strip()
@@ -604,6 +622,6 @@ class AFSAPI:
     async def select_preset(self, value: t.Union[Preset, int]):
         await self._enable_nav_if_necessary()
         return await self.handle_set(
-            "netRemote.nav.action.selectPreset",
+            API["selectPreset"],
             value.key if isinstance(value, Preset) else value,
         )
