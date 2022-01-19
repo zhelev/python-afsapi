@@ -90,3 +90,8 @@ ENV/
 
 # MyPy
 .mypy_cache/
+
+#VS Code
+.vscode
+
+afsapi/version.py
