@@ -10,5 +10,12 @@ build-backend = 'setuptools.build_meta'
 [tool.setuptools_scm]
 write_to = "afsapi/version.py"
 
+[tool.mypy]
+strict = true
+files=["afsapi"]
+exclude = [
+    "afsapi/__init__.py"
+]
+
 [pycodestyle]
 max_line_length = 120
