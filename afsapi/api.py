@@ -90,18 +90,11 @@ class AFSAPI:
         self,
         webfsapi_endpoint: str,
         pin: t.Union[str, int],
-        force_with_session=False,
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
     ):
         """Initialize the Frontier Silicon device."""
         self.webfsapi_endpoint = webfsapi_endpoint
         self.pin = str(pin)
-
-        # Older documentation for the Frontier Silicon API seems to always use
-        # a session, while this is not necessary on my device. I keep it as an
-        # option for backward compatability, but disable it by default to
-        # enable the usage of apps like UNDOK which need a session to function
-        self.force_with_session = force_with_session
         self.timeout = timeout
 
         self.sid: t.Optional[str] = None
@@ -143,14 +136,13 @@ class AFSAPI:
     async def create(
         fsapi_device_url: str,
         pin: t.Union[str, int],
-        force_with_session=False,
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
     ):
         webfsapi_endpoint = await AFSAPI.get_webfsapi_endpoint(
             fsapi_device_url, timeout
         )
 
-        return AFSAPI(webfsapi_endpoint, pin, force_with_session, timeout)
+        return AFSAPI(webfsapi_endpoint, pin, timeout)
 
     # http request helpers
     async def _create_session(self) -> t.Optional[str]:
@@ -162,19 +154,17 @@ class AFSAPI:
         self,
         path: str,
         extra: t.Optional[t.Dict[str, DataItem]] = None,
-        with_session=None,
-        force_new_session=False,
-        retrying=False,
+        force_new_session=False
     ) -> ET.Element:
         """Execute a frontier silicon API call."""
 
         params: t.Dict[str, DataItem] = dict(pin=self.pin)
 
-        if with_session or (with_session is None and self.force_with_session):
-            if not self.sid or force_new_session:
-                self.sid = await self._create_session()
-
+        if force_new_session:
+            self.sid = await self._create_session()
+        if self.sid:
             params.update(sid=self.sid)
+
         if extra:
             params.update(**extra)
 
@@ -195,10 +185,10 @@ class AFSAPI:
                         f"Service call failed with 404 to {self.webfsapi_endpoint}/{path}"
                     )
 
-                    if with_session and not force_new_session:
+                    if not force_new_session:
                         # retry command with a forced new session
                         return await self.__call(
-                            path, extra, with_session=True, force_new_session=True
+                            path, extra, force_new_session=True
                         )
                     else:
                         raise InvalidSessionException(
