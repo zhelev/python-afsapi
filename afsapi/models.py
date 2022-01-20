@@ -1,4 +1,3 @@
-import typing as t
 from enum import IntEnum
 from dataclasses import dataclass
 
@@ -44,5 +43,5 @@ class Equaliser:
 @dataclass
 class Preset:
     key: int
-    type: str
-    name: t.Optional[str]
+    type: str | None
+    name: str | None
