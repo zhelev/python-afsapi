@@ -4,12 +4,15 @@ Implements an asynchronous interface for a Frontier Silicon device.
 For example internet radios from: Medion, Hama, Auna, ...
 """
 
+import asyncio
 import typing as t
 import logging
 from afsapi.exceptions import (
     FSApiException,
+    InvalidPinException,
     InvalidSessionException,
     OutOfRangeException,
+    ConnectionError
 )
 from afsapi.models import Preset, Equaliser, PlayerMode, PlayControl, PlayState
 from afsapi.utils import unpack_xml, maybe
@@ -124,8 +127,8 @@ class AFSAPI:
                         f"Could not retrieve webfsapi endpoint from {fsapi_device_url}"
                     )
 
-            except aiohttp.ServerTimeoutError:
-                raise FSApiException(
+            except (aiohttp.ServerTimeoutError, asyncio.TimeoutError):
+                raise ConnectionError(
                     f"Did not get a response in time from {fsapi_device_url}"
                 )
             except aiohttp.ClientConnectionError:
@@ -179,7 +182,7 @@ class AFSAPI:
                 )
 
                 if result.status == 403:
-                    raise FSApiException("Access denied - incorrect PIN")
+                    raise InvalidPinException("Access denied - incorrect PIN")
                 elif result.status == 404:
                     # Bad session ID or service endpoint
                     logging.warn(
