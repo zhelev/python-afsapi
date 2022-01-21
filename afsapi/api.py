@@ -97,8 +97,8 @@ class AFSAPI:
         self.pin = str(pin)
         self.timeout = timeout
 
-        self.sid: str | None = None
-        self.__volume_steps: int | None = None
+        self.sid: t.Optional[str] = None
+        self.__volume_steps: t.Optional[int] = None
 
         self.__modes = None
         self.__equalisers = None
@@ -145,7 +145,7 @@ class AFSAPI:
         return AFSAPI(webfsapi_endpoint, pin, timeout)
 
     # http request helpers
-    async def _create_session(self) -> str | None:
+    async def _create_session(self) -> t.Optional[str]:
         return unpack_xml(
             await self.__call("CREATE_SESSION", retry_with_session=False), "sessionId"
         )
@@ -153,7 +153,7 @@ class AFSAPI:
     async def __call(
         self,
         path: str,
-        extra: t.Dict[str, DataItem] | None = None,
+        extra: t.Optional[t.Dict[str, DataItem]] = None,
         force_new_session: bool = False,
         retry_with_session: bool = True,
     ) -> ET.Element:
@@ -231,33 +231,33 @@ class AFSAPI:
     async def handle_get(self, item: str) -> ET.Element:
         return await self.__call(f"GET/{item}")
 
-    async def handle_set(self, item: str, value: t.Any) -> bool | None:
+    async def handle_set(self, item: str, value: t.Any) -> t.Optional[bool]:
         status = unpack_xml(
             await self.__call(f"SET/{item}", dict(value=value)), "status"
         )
         return maybe(status, lambda x: x == "FS_OK")
 
-    async def handle_text(self, item: str) -> str | None:
+    async def handle_text(self, item: str) -> t.Optional[str]:
         return unpack_xml(await self.handle_get(item), "value/c8_array")
 
-    async def handle_int(self, item: str) -> int | None:
+    async def handle_int(self, item: str) -> t.Optional[int]:
         val = unpack_xml(await self.handle_get(item), "value/u8")
         return maybe(val, int)
 
     # returns an int, assuming the value does not exceed 8 bits
-    async def handle_long(self, item: str) -> int | None:
+    async def handle_long(self, item: str) -> t.Optional[int]:
         val = unpack_xml(await self.handle_get(item), "value/u32")
         return maybe(val, int)
 
-    async def handle_signed_long(self, item: str,) -> int | None:
+    async def handle_signed_long(self, item: str,) -> t.Optional[int]:
         val = unpack_xml(await self.handle_get(item), "value/s32")
         return maybe(val, int)
 
-    async def handle_list(self, list_name: str) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, DataItem | None]]]:
-        def _handle_item(item: ET.Element,) -> t.Tuple[str, t.Dict[str, DataItem | None]]:
+    async def handle_list(self, list_name: str) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
+        def _handle_item(item: ET.Element,) -> t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]:
             key = item.attrib["key"]
 
-            def _handle_field(field: ET.Element) -> t.Tuple[str, DataItem | None]:
+            def _handle_field(field: ET.Element) -> t.Tuple[str, t.Optional[DataItem]]:
                 # TODO: Handle other field types
                 if "name" in field.attrib:
                     id = field.attrib["name"]
@@ -269,7 +269,7 @@ class AFSAPI:
             value = dict(map(_handle_field, item.findall("field")))
             return key, value
 
-        async def _get_next_items(start: int, count: int) -> list[ET.Element] | None:
+        async def _get_next_items(start: int, count: int) -> t.Optional[list[ET.Element]]:
             try:
                 doc = await self.__call(f"LIST_GET_NEXT/{list_name}/{start}", {"maxItems": count})
 
@@ -297,33 +297,33 @@ class AFSAPI:
             has_next = len(items) == count
 
     # sys
-    async def get_friendly_name(self) -> str | None:
+    async def get_friendly_name(self) -> t.Optional[str]:
         """Get the friendly name of the device."""
         return await self.handle_text(API["friendly_name"])
 
-    async def set_friendly_name(self, value: str) -> bool | None:
+    async def set_friendly_name(self, value: str) -> t.Optional[bool]:
         """Set the friendly name of the device."""
         return await self.handle_set(API["friendly_name"], value)
 
-    async def get_version(self) -> str | None:
+    async def get_version(self) -> t.Optional[str]:
         """Get the friendly name of the device."""
         return await self.handle_text(API["version"])
 
-    async def get_radio_id(self) -> str | None:
+    async def get_radio_id(self) -> t.Optional[str]:
         """Get the friendly name of the device."""
         return await self.handle_text(API["radio_id"])
 
-    async def get_power(self) -> bool | None:
+    async def get_power(self) -> t.Optional[bool]:
         """Check if the device is on."""
         power = await self.handle_int(API["power"])
         return bool(power)
 
-    async def set_power(self, value: bool = False) -> bool | None:
+    async def set_power(self, value: bool = False) -> t.Optional[bool]:
         """Power on or off the device."""
         power = await self.handle_set(API["power"], int(value))
         return bool(power)
 
-    async def get_volume_steps(self) -> int | None:
+    async def get_volume_steps(self) -> t.Optional[int]:
         """Read the maximum volume level of the device."""
         if not self.__volume_steps:
             self.__volume_steps = await self.handle_int(API["volume_steps"])
@@ -331,26 +331,26 @@ class AFSAPI:
         return self.__volume_steps
 
     # Volume
-    async def get_volume(self) -> int | None:
+    async def get_volume(self) -> t.Optional[int]:
         """Read the volume level of the device."""
         return await self.handle_int(API["volume"])
 
-    async def set_volume(self, value: int) -> bool | None:
+    async def set_volume(self, value: int) -> t.Optional[bool]:
         """Set the volume level of the device."""
         return await self.handle_set(API["volume"], value)
 
     # Mute
-    async def get_mute(self) -> bool | None:
+    async def get_mute(self) -> t.Optional[bool]:
         """Check if the device is muted."""
         mute = await self.handle_int(API["mute"])
         return bool(mute)
 
-    async def set_mute(self, value: bool = False) -> bool | None:
+    async def set_mute(self, value: bool = False) -> t.Optional[bool]:
         """Mute or unmute the device."""
         mute = await self.handle_set(API["mute"], int(value))
         return bool(mute)
 
-    async def get_play_status(self) -> PlayState | None:
+    async def get_play_status(self) -> t.Optional[PlayState]:
         """Get the play status of the device."""
         status = await self.handle_int(API["status"])
         if status:
@@ -358,51 +358,51 @@ class AFSAPI:
         else:
             return None
 
-    async def get_play_name(self) -> str | None:
+    async def get_play_name(self) -> t.Optional[str]:
         """Get the name of the played item."""
         return await self.handle_text(API["name"])
 
-    async def get_play_text(self) -> str | None:
+    async def get_play_text(self) -> t.Optional[str]:
         """Get the text associated with the played media."""
         return await self.handle_text(API["text"])
 
-    async def get_play_artist(self) -> str | None:
+    async def get_play_artist(self) -> t.Optional[str]:
         """Get the artists of the current media(song)."""
         return await self.handle_text(API["artist"])
 
-    async def get_play_album(self) -> str | None:
+    async def get_play_album(self) -> t.Optional[str]:
         """Get the songs's album."""
         return await self.handle_text(API["album"])
 
-    async def get_play_graphic(self) -> str | None:
+    async def get_play_graphic(self) -> t.Optional[str]:
         """Get the album art associated with the song/album/artist."""
         return await self.handle_text(API["graphic_uri"])
 
     # Shuffle
-    async def get_play_shuffle(self) -> bool | None:
+    async def get_play_shuffle(self) -> t.Optional[bool]:
         status = await self.handle_int(API["shuffle"])
         if status:
             return status == 1
         return None
 
-    async def set_play_shuffle(self, value: bool) -> bool | None:
+    async def set_play_shuffle(self, value: bool) -> t.Optional[bool]:
         return await self.handle_set(API["shuffle"], int(value))
 
     # Repeat
-    async def get_play_repeat(self) -> bool | None:
+    async def get_play_repeat(self) -> t.Optional[bool]:
         status = await self.handle_int(API["repeat"])
         if status:
             return status == 1
         return None
 
-    async def play_repeat(self, value: bool) -> bool | None:
+    async def play_repeat(self, value: bool) -> t.Optional[bool]:
         return await self.handle_set(API["repeat"], int(value))
 
-    async def get_play_duration(self) -> int | None:
+    async def get_play_duration(self) -> t.Optional[int]:
         """Get the duration of the played media."""
         return await self.handle_long(API["duration"])
 
-    async def get_play_position(self) -> int | None:
+    async def get_play_position(self) -> t.Optional[int]:
         """
         The user can jump to a specific moment of the track. This means that the range of the value is
         different with every track.
@@ -412,11 +412,11 @@ class AFSAPI:
         """
         return await self.handle_int(API["position"])
 
-    async def set_play_position(self, value: int) -> bool | None:
+    async def set_play_position(self, value: int) -> t.Optional[bool]:
         return await self.handle_set(API["position"], value)
 
     # Play  rate
-    async def get_play_rate(self) -> int | None:
+    async def get_play_rate(self) -> t.Optional[int]:
         """
         * -127 to -1: When the user sends a negative value, the music player will rewind the track.
           The speed depends on the value, -10 will rewind faster than value -2
@@ -428,7 +428,7 @@ class AFSAPI:
         """
         return await self.handle_int(API["rate"])
 
-    async def set_play_rate(self, value: int) -> bool | None:
+    async def set_play_rate(self, value: int) -> t.Optional[bool]:
         if -127 <= value <= 127:
             return await self.handle_set(API["rate"], value)
         else:
@@ -436,7 +436,7 @@ class AFSAPI:
 
     # play controls
 
-    async def play_control(self, value: t.Union[PlayControl, int]) -> bool | None:
+    async def play_control(self, value: t.Union[PlayControl, int]) -> t.Optional[bool]:
         """
         Control the player of the device.
 
@@ -444,19 +444,19 @@ class AFSAPI:
         """
         return await self.handle_set(API["control"], int(value))
 
-    async def play(self) -> bool | None:
+    async def play(self) -> t.Optional[bool]:
         """Play media."""
         return await self.play_control(PlayControl.PLAY)
 
-    async def pause(self) -> bool | None:
+    async def pause(self) -> t.Optional[bool]:
         """Pause playing."""
         return await self.play_control(PlayControl.PAUSE)
 
-    async def forward(self) -> bool | None:
+    async def forward(self) -> t.Optional[bool]:
         """Next media."""
         return await self.play_control(PlayControl.NEXT)
 
-    async def rewind(self) -> bool | None:
+    async def rewind(self) -> t.Optional[bool]:
         """Previous media."""
         return await self.play_control(PlayControl.PREV)
 
@@ -473,7 +473,7 @@ class AFSAPI:
         return self.__equalisers  # type: ignore
 
     # EQ Presets
-    async def get_eq_preset(self) -> Equaliser | None:
+    async def get_eq_preset(self) -> t.Optional[Equaliser]:
         v = await self.handle_int(API["eqpreset"])
         if not v:
             return None
@@ -485,7 +485,7 @@ class AFSAPI:
         raise FSApiException(
             f"Could not retrieve equaliser {v} in equaliser list")
 
-    async def set_eq_preset(self, value: t.Union[Equaliser, int]) -> bool | None:
+    async def set_eq_preset(self, value: t.Union[Equaliser, int]) -> t.Optional[bool]:
         return await self.handle_set(
             API["eqpreset"],
             int(value.key) if isinstance(value, Equaliser) else value,
@@ -495,23 +495,23 @@ class AFSAPI:
     async def get_eq_loudness(self) -> bool:
         return bool(await self.handle_int(API["eqloudness"]))
 
-    async def set_eq_loudness(self, value: bool) -> bool | None:
+    async def set_eq_loudness(self, value: bool) -> t.Optional[bool]:
         return await self.handle_set(API["eqloudness"], int(value))
 
     # Bass and Treble
-    async def get_bass(self) -> int | None:
+    async def get_bass(self) -> t.Optional[int]:
         return await self.handle_int(API["bass"])
 
-    async def set_bass(self, value: bool) -> bool | None:
+    async def set_bass(self, value: bool) -> t.Optional[bool]:
         if -14 <= value <= 14:
             return await self.handle_set(API["bass"], int(value))
         else:
             raise ValueError("Outside of bounds: [-14, 14]")
 
-    async def get_treble(self) -> int | None:
+    async def get_treble(self) -> t.Optional[int]:
         return await self.handle_int(API["treble"])
 
-    async def set_treble(self, value: bool) -> bool | None:
+    async def set_treble(self, value: bool) -> t.Optional[bool]:
         if -14 <= value <= 14:
             return await self.handle_set(API["treble"], int(value))
         else:
@@ -520,7 +520,7 @@ class AFSAPI:
     # Mode
     async def _get_modes(
         self,
-    ) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, DataItem | None]]]:
+    ) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
         async for mode in self.handle_list(API["valid_modes"]):
             yield mode
 
@@ -534,7 +534,7 @@ class AFSAPI:
 
         return self.__modes  # type: ignore
 
-    async def get_mode(self) -> PlayerMode | None:
+    async def get_mode(self) -> t.Optional[PlayerMode]:
         """Get the currently active mode on the device (DAB, FM, Spotify)."""
         int_mode = await self.handle_long(API["mode"])
         if int_mode is None:
@@ -547,18 +547,18 @@ class AFSAPI:
         raise FSApiException(
             f"Could not retrieve mode {int_mode} in modes list")
 
-    async def set_mode(self, value: t.Union[PlayerMode, str]) -> bool | None:
+    async def set_mode(self, value: t.Union[PlayerMode, str]) -> t.Optional[bool]:
         """Set the currently active mode on the device (DAB, FM, Spotify)."""
         return await self.handle_set(
             API["mode"], value.key if isinstance(value, PlayerMode) else value
         )
 
     # Sleep
-    async def get_sleep(self) -> int | None:
+    async def get_sleep(self) -> t.Optional[int]:
         """Check when and if the device is going to sleep."""
         return await self.handle_long(API["sleep"])
 
-    async def set_sleep(self, value: bool = False) -> bool | None:
+    async def set_sleep(self, value: bool = False) -> t.Optional[bool]:
         """Set device sleep timer."""
         return await self.handle_set(API["sleep"], int(value))
 
@@ -569,23 +569,23 @@ class AFSAPI:
         if nav_state != 1:
             await self.handle_set(API["nav_state"], 1)
 
-    async def nav_get_numitems(self) -> int | None:
+    async def nav_get_numitems(self) -> t.Optional[int]:
         await self._enable_nav_if_necessary()
         return await self.handle_signed_long(API["numitems"])
 
-    async def nav_list(self) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, DataItem | None]]]:
+    async def nav_list(self) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
         await self._enable_nav_if_necessary()
         return self.handle_list(API["nav_list"])
 
-    async def nav_select_folder(self, value: int) -> bool | None:
+    async def nav_select_folder(self, value: int) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
         return await self.handle_set(API["navigate"], value)
 
-    async def nav_select_parent_folder(self) -> bool | None:
+    async def nav_select_parent_folder(self) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
         return await self.handle_set(API["navigate"], "0xffffffff")
 
-    async def nav_select_item(self, value: int) -> bool | None:
+    async def nav_select_item(self, value: int) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
         return await self.handle_set(API["selectItem"], value)
 
@@ -593,7 +593,7 @@ class AFSAPI:
 
     async def _get_presets(
         self,
-    ) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, DataItem | None]]]:
+    ) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
         await self._enable_nav_if_necessary()
 
         async for key, preset in self.handle_list(API["presets"]):
@@ -610,7 +610,7 @@ class AFSAPI:
 
         # We don't cache this call as it changes when the mode changes
 
-        def _to_preset(key: str, preset_fields: t.Dict[str, DataItem | None]) -> Preset:
+        def _to_preset(key: str, preset_fields: t.Dict[str, t.Optional[DataItem]]) -> Preset:
             assert isinstance(preset_fields["name"], str)
             type = str(preset_fields["type"]
                        ) if "type" in preset_fields else None
@@ -621,7 +621,7 @@ class AFSAPI:
             async for key, preset_fields in self._get_presets()
         ]
 
-    async def select_preset(self, value: t.Union[Preset, int]) -> bool | None:
+    async def select_preset(self, value: t.Union[Preset, int]) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
         return await self.handle_set(
             API["selectPreset"],
