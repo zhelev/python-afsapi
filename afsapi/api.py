@@ -25,6 +25,8 @@ DataItem = t.Union[str, int]
 
 DEFAULT_TIMEOUT_IN_SECONDS = 5
 
+DEFAULT_NAVIGATION_WAIT_TIMES_IN_SECONDS = 0.5
+
 FSApiValueType = Enum("FSApiValueType", "TEXT BOOL INT LONG SIGNED_LONG")
 
 VALUE_TYPE_TO_XML_PATH = {
@@ -83,6 +85,8 @@ API = {
     "selectPreset": "netRemote.nav.action.selectPreset",
 }
 
+LOGGER = logging.getLogger(__name__)
+
 # pylint: disable=R0904
 
 
@@ -94,17 +98,21 @@ class AFSAPI:
         webfsapi_endpoint: str,
         pin: t.Union[str, int],
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
+        nav_wait: float = DEFAULT_NAVIGATION_WAIT_TIMES_IN_SECONDS
     ):
         """Initialize the Frontier Silicon device."""
         self.webfsapi_endpoint = webfsapi_endpoint
         self.pin = str(pin)
         self.timeout = timeout
+        self.nav_wait = nav_wait
 
         self.sid: t.Optional[str] = None
         self.__volume_steps: t.Optional[int] = None
 
         self.__modes = None
         self.__equalisers = None
+
+        self._current_nav_path: list[int] = []
 
     @staticmethod
     async def get_webfsapi_endpoint(
@@ -180,6 +188,8 @@ class AFSAPI:
                 result = await client.get(
                     f"{self.webfsapi_endpoint}/{path}", params=params
                 )
+
+                LOGGER.debug(f"Called {path} with {params}: {result.status}")
 
                 if result.status == 403:
                     raise InvalidPinException("Access denied - incorrect PIN")
@@ -272,32 +282,34 @@ class AFSAPI:
             value = dict(map(_handle_field, item.findall("field")))
             return key, value
 
-        async def _get_next_items(start: int, count: int) -> t.Optional[list[ET.Element]]:
+        async def _get_next_items(start: int, count: int) -> t.Tuple[list[ET.Element], bool]:
             try:
                 doc = await self.__call(f"LIST_GET_NEXT/{list_name}/{start}", {"maxItems": count})
 
                 if doc and unpack_xml(doc, "status") == "FS_OK":
-                    return doc.findall("item")
+                    return doc.findall("item"), doc.find("listend") is not None
                 else:
-                    return None
+                    return [], True
             except OutOfRangeException:
-                return None
+                return [], True
 
         start = -1
-        count = 25
+        count = 50  # asking for more items gives a bigger chance on FS_NODE_BLOCKED errors on subsequent requests
         has_next = True
 
         while has_next:
-            items = await _get_next_items(start, count)
-
-            if items is None:
-                return
+            items, end_reached = await _get_next_items(start, count)
 
             for item in items:
                 yield _handle_item(item)
 
             start += count
-            has_next = len(items) == count
+
+            if end_reached:
+                has_next = False
+            else:
+                # going to fast gives FS_BLOCKED_NODE errors
+                await asyncio.sleep(self.nav_wait)
 
     # sys
     async def get_friendly_name(self) -> t.Optional[str]:
@@ -552,9 +564,11 @@ class AFSAPI:
 
     async def set_mode(self, value: t.Union[PlayerMode, str]) -> t.Optional[bool]:
         """Set the currently active mode on the device (DAB, FM, Spotify)."""
-        return await self.handle_set(
+        result = await self.handle_set(
             API["mode"], value.key if isinstance(value, PlayerMode) else value
         )
+        self._current_nav_path = []
+        return result
 
     # Sleep
     async def get_sleep(self) -> t.Optional[int]:
@@ -572,6 +586,9 @@ class AFSAPI:
         if nav_state != 1:
             await self.handle_set(API["nav_state"], 1)
 
+            # Allow the device to get into nav mode
+            await asyncio.sleep(2*self.nav_wait)
+
     async def nav_get_numitems(self) -> t.Optional[int]:
         await self._enable_nav_if_necessary()
         return await self.handle_signed_long(API["numitems"])
@@ -582,15 +599,60 @@ class AFSAPI:
 
     async def nav_select_folder(self, value: int) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
-        return await self.handle_set(API["navigate"], value)
+        result = await self.handle_set(API["navigate"], value)
+        self._current_nav_path.append(value)
+
+        # Going too fast would cause a FS_NODE_BLOCKED error on the next nav-request
+        await asyncio.sleep(self.nav_wait)
+        return result
 
     async def nav_select_parent_folder(self) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
-        return await self.handle_set(API["navigate"], "0xffffffff")
+        result = await self.handle_set(API["navigate"], "0xffffffff")
+        self._current_nav_path.pop()
+
+        # Going too fast would cause a FS_NODE_BLOCKED error on the next nav-request
+        await asyncio.sleep(self.nav_wait)
+        return result
 
     async def nav_select_item(self, value: int) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
         return await self.handle_set(API["selectItem"], value)
+
+    async def nav_reset(self) -> t.Optional[bool]:
+        return await self.handle_set(API["nav_state"], 0)
+
+    async def nav_select_folder_via_path(self, path: list[int]) -> t.Optional[bool]:
+        """Navigates to a target folder from the current folder in as litte steps as necessary."""
+        result = None
+
+        LOGGER.debug("Navigating to %s, currently in %s",
+                     path, self._current_nav_path)
+
+        while len(self._current_nav_path) > len(path):
+            LOGGER.debug("Going up to parent folder in %s",
+                         self._current_nav_path)
+            result = await self.nav_select_parent_folder()
+
+        key_idx = 0
+        while key_idx < len(path):
+            key = int(path[key_idx])
+            if key_idx >= len(self._current_nav_path):
+                LOGGER.debug("Selecting %s in %s", key, self._current_nav_path)
+                result = await self.nav_select_folder(key)
+                key_idx += 1
+            elif key != self._current_nav_path[key_idx]:
+                LOGGER.debug("Going up to parent folder in %s",
+                             self._current_nav_path)
+                result = await self.nav_select_parent_folder()
+            else:
+                key_idx += 1
+
+        return result
+
+    async def nav_select_item_via_path(self, path: list[int]) -> t.Optional[bool]:
+        await self.nav_select_folder_via_path(path[:-1])
+        return await self.nav_select_item(path[-1])
 
     # Presets
 
