@@ -1,5 +1,8 @@
-
 class FSApiException(Exception):
+    pass
+
+
+class NotImplementedException(Exception):
     pass
 
 

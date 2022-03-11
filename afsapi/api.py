@@ -11,10 +11,12 @@ from afsapi.exceptions import (
     FSApiException,
     InvalidPinException,
     InvalidSessionException,
+    NotImplementedException,
     OutOfRangeException,
-    ConnectionError
+    ConnectionError,
 )
 from afsapi.models import Preset, Equaliser, PlayerMode, PlayControl, PlayState
+from afsapi.throttler import Throttler
 from afsapi.utils import unpack_xml, maybe
 from enum import Enum
 import aiohttp
@@ -25,7 +27,7 @@ DataItem = t.Union[str, int]
 
 DEFAULT_TIMEOUT_IN_SECONDS = 5
 
-DEFAULT_NAVIGATION_WAIT_TIMES_IN_SECONDS = 0.5
+DEFAULT_TIME_BETWEEN_CALLS_IN_SECONDS = 0.3
 
 FSApiValueType = Enum("FSApiValueType", "TEXT BOOL INT LONG SIGNED_LONG")
 
@@ -98,13 +100,13 @@ class AFSAPI:
         webfsapi_endpoint: str,
         pin: t.Union[str, int],
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
-        nav_wait: float = DEFAULT_NAVIGATION_WAIT_TIMES_IN_SECONDS
+        time_between_calls: float = DEFAULT_TIME_BETWEEN_CALLS_IN_SECONDS,
     ):
         """Initialize the Frontier Silicon device."""
         self.webfsapi_endpoint = webfsapi_endpoint
         self.pin = str(pin)
         self.timeout = timeout
-        self.nav_wait = nav_wait
+        self.time_between_calls = time_between_calls
 
         self.sid: t.Optional[str] = None
         self.__volume_steps: t.Optional[int] = None
@@ -113,6 +115,8 @@ class AFSAPI:
         self.__equalisers = None
 
         self._current_nav_path: list[int] = []
+
+        self.__throttler = Throttler(time_between_calls)
 
     @staticmethod
     async def get_webfsapi_endpoint(
@@ -140,20 +144,20 @@ class AFSAPI:
                     f"Did not get a response in time from {fsapi_device_url}"
                 )
             except aiohttp.ClientConnectionError:
-                raise ConnectionError(
-                    f"Could not connect to {fsapi_device_url}")
+                raise ConnectionError(f"Could not connect to {fsapi_device_url}")
 
     @staticmethod
     async def create(
         fsapi_device_url: str,
         pin: t.Union[str, int],
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
-    ) -> 'AFSAPI':
+        time_between_calls: float = DEFAULT_TIME_BETWEEN_CALLS_IN_SECONDS,
+    ) -> "AFSAPI":
         webfsapi_endpoint = await AFSAPI.get_webfsapi_endpoint(
             fsapi_device_url, timeout
         )
 
-        return AFSAPI(webfsapi_endpoint, pin, timeout)
+        return AFSAPI(webfsapi_endpoint, pin, timeout, time_between_calls)
 
     # http request helpers
     async def _create_session(self) -> t.Optional[str]:
@@ -185,9 +189,10 @@ class AFSAPI:
             timeout=aiohttp.ClientTimeout(total=self.timeout),
         ) as client:
             try:
-                result = await client.get(
-                    f"{self.webfsapi_endpoint}/{path}", params=params
-                )
+                async with self.__throttler:
+                    result = await client.get(
+                        f"{self.webfsapi_endpoint}/{path}", params=params
+                    )
 
                 LOGGER.debug(f"Called {path} with {params}: {result.status}")
 
@@ -201,9 +206,7 @@ class AFSAPI:
 
                     if not force_new_session and retry_with_session:
                         # retry command with a forced new session
-                        return await self.__call(
-                            path, extra, force_new_session=True
-                        )
+                        return await self.__call(path, extra, force_new_session=True)
                     else:
                         raise InvalidSessionException(
                             "Wrong session-id or invalid command"
@@ -212,14 +215,13 @@ class AFSAPI:
                     raise FSApiException(
                         f"Unexpected result {result.status}: {await result.text()}"
                     )
-
                 doc = ET.fromstring(await result.text(encoding="utf-8"))
                 status = unpack_xml(doc, "status")
 
                 if status == "FS_OK" or status == "FS_LIST_END":
                     return doc
                 elif status == "FS_NODE_DOES_NOT_EXIST":
-                    raise FSApiException(
+                    raise NotImplementedException(
                         f"FSAPI service {path} not implemented at {self.webfsapi_endpoint}."
                     )
                 elif status == "FS_NODE_BLOCKED":
@@ -234,8 +236,7 @@ class AFSAPI:
                 logging.error(f"Unexpected FSAPI status {status}")
                 raise FSApiException(f"Unexpected FSAPI status '{status}'")
             except aiohttp.ClientConnectionError:
-                raise ConnectionError(
-                    f"Could not connect to {self.webfsapi_endpoint}")
+                raise ConnectionError(f"Could not connect to {self.webfsapi_endpoint}")
 
     # Helper methods
 
@@ -262,12 +263,19 @@ class AFSAPI:
         val = unpack_xml(await self.handle_get(item), "value/u32")
         return maybe(val, int)
 
-    async def handle_signed_long(self, item: str,) -> t.Optional[int]:
+    async def handle_signed_long(
+        self,
+        item: str,
+    ) -> t.Optional[int]:
         val = unpack_xml(await self.handle_get(item), "value/s32")
         return maybe(val, int)
 
-    async def handle_list(self, list_name: str) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
-        def _handle_item(item: ET.Element,) -> t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]:
+    async def handle_list(
+        self, list_name: str
+    ) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
+        def _handle_item(
+            item: ET.Element,
+        ) -> t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]:
             key = item.attrib["key"]
 
             def _handle_field(field: ET.Element) -> t.Tuple[str, t.Optional[DataItem]]:
@@ -282,9 +290,13 @@ class AFSAPI:
             value = dict(map(_handle_field, item.findall("field")))
             return key, value
 
-        async def _get_next_items(start: int, count: int) -> t.Tuple[list[ET.Element], bool]:
+        async def _get_next_items(
+            start: int, count: int
+        ) -> t.Tuple[list[ET.Element], bool]:
             try:
-                doc = await self.__call(f"LIST_GET_NEXT/{list_name}/{start}", {"maxItems": count})
+                doc = await self.__call(
+                    f"LIST_GET_NEXT/{list_name}/{start}", {"maxItems": count}
+                )
 
                 if doc and unpack_xml(doc, "status") == "FS_OK":
                     return doc.findall("item"), doc.find("listend") is not None
@@ -307,9 +319,6 @@ class AFSAPI:
 
             if end_reached:
                 has_next = False
-            else:
-                # going to fast gives FS_BLOCKED_NODE errors
-                await asyncio.sleep(self.nav_wait)
 
     # sys
     async def get_friendly_name(self) -> t.Optional[str]:
@@ -497,8 +506,7 @@ class AFSAPI:
             if eq.key == str(v):
                 return eq
 
-        raise FSApiException(
-            f"Could not retrieve equaliser {v} in equaliser list")
+        raise FSApiException(f"Could not retrieve equaliser {v} in equaliser list")
 
     async def set_eq_preset(self, value: t.Union[Equaliser, int]) -> t.Optional[bool]:
         return await self.handle_set(
@@ -544,8 +552,10 @@ class AFSAPI:
 
         # Cache as this never changes
         if self.__modes is None:
-            self.__modes = [PlayerMode(key=k, **v)  # type: ignore
-                            async for k, v in self._get_modes()]
+            self.__modes = [
+                PlayerMode(key=k, **v)  # type: ignore
+                async for k, v in self._get_modes()
+            ]
 
         return self.__modes  # type: ignore
 
@@ -559,8 +569,7 @@ class AFSAPI:
             if mode.key == str(int_mode):
                 return mode
 
-        raise FSApiException(
-            f"Could not retrieve mode {int_mode} in modes list")
+        raise FSApiException(f"Could not retrieve mode {int_mode} in modes list")
 
     async def set_mode(self, value: t.Union[PlayerMode, str]) -> t.Optional[bool]:
         """Set the currently active mode on the device (DAB, FM, Spotify)."""
@@ -586,14 +595,19 @@ class AFSAPI:
         if nav_state != 1:
             await self.handle_set(API["nav_state"], 1)
 
-            # Allow the device to get into nav mode
-            await asyncio.sleep(2*self.nav_wait)
+            # Allow the device to get into nav mode, this is slow!
+            await asyncio.sleep(2 * self.time_between_calls)
+
+            # the nav path is empty, as we needed to set the radio into nav-mode
+            self._current_nav_path = []
 
     async def nav_get_numitems(self) -> t.Optional[int]:
         await self._enable_nav_if_necessary()
         return await self.handle_signed_long(API["numitems"])
 
-    async def nav_list(self) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
+    async def nav_list(
+        self,
+    ) -> t.AsyncIterable[t.Tuple[str, t.Dict[str, t.Optional[DataItem]]]]:
         await self._enable_nav_if_necessary()
         return self.handle_list(API["nav_list"])
 
@@ -602,8 +616,6 @@ class AFSAPI:
         result = await self.handle_set(API["navigate"], value)
         self._current_nav_path.append(value)
 
-        # Going too fast would cause a FS_NODE_BLOCKED error on the next nav-request
-        await asyncio.sleep(self.nav_wait)
         return result
 
     async def nav_select_parent_folder(self) -> t.Optional[bool]:
@@ -611,8 +623,6 @@ class AFSAPI:
         result = await self.handle_set(API["navigate"], "0xffffffff")
         self._current_nav_path.pop()
 
-        # Going too fast would cause a FS_NODE_BLOCKED error on the next nav-request
-        await asyncio.sleep(self.nav_wait)
         return result
 
     async def nav_select_item(self, value: int) -> t.Optional[bool]:
@@ -620,18 +630,17 @@ class AFSAPI:
         return await self.handle_set(API["selectItem"], value)
 
     async def nav_reset(self) -> t.Optional[bool]:
+        self._current_nav_path = []
         return await self.handle_set(API["nav_state"], 0)
 
     async def nav_select_folder_via_path(self, path: list[int]) -> t.Optional[bool]:
         """Navigates to a target folder from the current folder in as litte steps as necessary."""
         result = None
 
-        LOGGER.debug("Navigating to %s, currently in %s",
-                     path, self._current_nav_path)
+        LOGGER.debug("Navigating to %s, currently in %s", path, self._current_nav_path)
 
         while len(self._current_nav_path) > len(path):
-            LOGGER.debug("Going up to parent folder in %s",
-                         self._current_nav_path)
+            LOGGER.debug("Going up to parent folder in %s", self._current_nav_path)
             result = await self.nav_select_parent_folder()
 
         key_idx = 0
@@ -642,8 +651,7 @@ class AFSAPI:
                 result = await self.nav_select_folder(key)
                 key_idx += 1
             elif key != self._current_nav_path[key_idx]:
-                LOGGER.debug("Going up to parent folder in %s",
-                             self._current_nav_path)
+                LOGGER.debug("Going up to parent folder in %s", self._current_nav_path)
                 result = await self.nav_select_parent_folder()
             else:
                 key_idx += 1
@@ -675,10 +683,11 @@ class AFSAPI:
 
         # We don't cache this call as it changes when the mode changes
 
-        def _to_preset(key: str, preset_fields: t.Dict[str, t.Optional[DataItem]]) -> Preset:
+        def _to_preset(
+            key: str, preset_fields: t.Dict[str, t.Optional[DataItem]]
+        ) -> Preset:
             assert isinstance(preset_fields["name"], str)
-            type = str(preset_fields["type"]
-                       ) if "type" in preset_fields else None
+            type = str(preset_fields["type"]) if "type" in preset_fields else None
             return Preset(int(key), type, preset_fields["name"])
 
         return [
