@@ -5,6 +5,7 @@ For example internet radios from: Medion, Hama, Auna, ...
 """
 
 import asyncio
+from asyncio.exceptions import TimeoutError
 import typing as t
 import logging
 from afsapi.exceptions import (
@@ -25,7 +26,7 @@ import xml.etree.ElementTree as ET
 DataItem = t.Union[str, int]
 
 
-DEFAULT_TIMEOUT_IN_SECONDS = 5
+DEFAULT_TIMEOUT_IN_SECONDS = 15
 
 DEFAULT_TIME_BETWEEN_CALLS_IN_SECONDS = 0.3
 
@@ -237,6 +238,13 @@ class AFSAPI:
                 raise FSApiException(f"Unexpected FSAPI status '{status}'")
             except aiohttp.ClientConnectionError:
                 raise ConnectionError(f"Could not connect to {self.webfsapi_endpoint}")
+            except TimeoutError:
+                if not force_new_session and retry_with_session:
+                    return await self.__call(path, extra, force_new_session=True)
+                else:
+                    raise ConnectionError(
+                        f"{self.webfsapi_endpoint} did not respond within {self.timeout} seconds"
+                    )
 
     # Helper methods
 
