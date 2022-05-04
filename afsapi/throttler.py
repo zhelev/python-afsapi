@@ -5,33 +5,46 @@ from typing import Optional, Type, Any
 from types import TracebackType
 
 
-class Throttler(AbstractAsyncContextManager[Any]):
-    """Ensures that a time between executions is taken into account for each wrapped code block."""
+class Throttler:
+    """Ensures that a time between executions is taken into account for each wrapped code block,
+    which can be configured for every entry."""
 
-    def __init__(self, time_between_executions_in_s: float) -> None:
-        self.time_between_executions_in_s = time_between_executions_in_s
-
+    def __init__(self) -> None:
         self._lock = asyncio.Lock()
-        self._last_execution_end: Optional[float] = None
-        pass
+        self._next_execution_not_before: Optional[float] = None
 
-    async def __aenter__(self) -> None:
-        await self._lock.acquire()
-        if self._last_execution_end is not None:
-            time_since_last_execution = time.monotonic() - self._last_execution_end
-            if time_since_last_execution < self.time_between_executions_in_s:
-                await asyncio.sleep(
-                    self.time_between_executions_in_s - time_since_last_execution
+    class _ThrottleContextManager(AbstractAsyncContextManager[Any]):
+        """Ensures that a time between executions is taken into account for each wrapped code block."""
+
+        def __init__(
+            self, throttler: "Throttler", time_after_execution_s: float
+        ) -> None:
+            self.throttler = throttler
+            self.time_after_execution_s = time_after_execution_s
+
+        async def __aenter__(self) -> None:
+            await self.throttler._lock.acquire()
+            if self.throttler._next_execution_not_before is not None:
+                additional_wait = (
+                    self.throttler._next_execution_not_before - time.monotonic()
                 )
 
-        return None
+                if additional_wait > 0:
+                    await asyncio.sleep(additional_wait)
 
-    async def __aexit__(
-        self,
-        exc_type: Optional[Type[BaseException]],
-        exc: Optional[BaseException],
-        tb: Optional[TracebackType],
-    ) -> None:
-        self._last_execution_end = time.monotonic()
-        self._lock.release()
-        return None
+            return None
+
+        async def __aexit__(
+            self,
+            exc_type: Optional[Type[BaseException]],
+            exc: Optional[BaseException],
+            tb: Optional[TracebackType],
+        ) -> None:
+            self.throttler._next_execution_not_before = (
+                time.monotonic() + self.time_after_execution_s
+            )
+            self.throttler._lock.release()
+            return None
+
+    def throttle(self, throttle_after_call_s: float) -> _ThrottleContextManager:
+        return Throttler._ThrottleContextManager(self, throttle_after_call_s)

@@ -28,7 +28,9 @@ DataItem = t.Union[str, int]
 
 DEFAULT_TIMEOUT_IN_SECONDS = 15
 
-DEFAULT_TIME_BETWEEN_CALLS_IN_SECONDS = 0.3
+TIME_AFTER_READ_CALLS_IN_SECONDS = 0
+TIME_AFTER_SET_CALLS_IN_SECONDS = 0.3
+TIME_AFTER_SLOW_SET_CALLS_IN_SECONDS = 1.0
 
 FSApiValueType = Enum("FSApiValueType", "TEXT BOOL INT LONG SIGNED_LONG")
 
@@ -101,13 +103,11 @@ class AFSAPI:
         webfsapi_endpoint: str,
         pin: t.Union[str, int],
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
-        time_between_calls: float = DEFAULT_TIME_BETWEEN_CALLS_IN_SECONDS,
     ):
         """Initialize the Frontier Silicon device."""
         self.webfsapi_endpoint = webfsapi_endpoint
         self.pin = str(pin)
         self.timeout = timeout
-        self.time_between_calls = time_between_calls
 
         self.sid: t.Optional[str] = None
         self.__volume_steps: t.Optional[int] = None
@@ -117,7 +117,7 @@ class AFSAPI:
 
         self._current_nav_path: list[int] = []
 
-        self.__throttler = Throttler(time_between_calls)
+        self.__throttler = Throttler()
 
     @staticmethod
     async def get_webfsapi_endpoint(
@@ -152,13 +152,12 @@ class AFSAPI:
         fsapi_device_url: str,
         pin: t.Union[str, int],
         timeout: int = DEFAULT_TIMEOUT_IN_SECONDS,
-        time_between_calls: float = DEFAULT_TIME_BETWEEN_CALLS_IN_SECONDS,
     ) -> "AFSAPI":
         webfsapi_endpoint = await AFSAPI.get_webfsapi_endpoint(
             fsapi_device_url, timeout
         )
 
-        return AFSAPI(webfsapi_endpoint, pin, timeout, time_between_calls)
+        return AFSAPI(webfsapi_endpoint, pin, timeout)
 
     # http request helpers
     async def _create_session(self) -> t.Optional[str]:
@@ -172,6 +171,7 @@ class AFSAPI:
         extra: t.Optional[t.Dict[str, DataItem]] = None,
         force_new_session: bool = False,
         retry_with_session: bool = True,
+        throttle_wait_after_call: float = TIME_AFTER_READ_CALLS_IN_SECONDS,
     ) -> ET.Element:
         """Execute a frontier silicon API call."""
 
@@ -190,7 +190,7 @@ class AFSAPI:
             timeout=aiohttp.ClientTimeout(total=self.timeout),
         ) as client:
             try:
-                async with self.__throttler:
+                async with self.__throttler.throttle(throttle_wait_after_call):
                     result = await client.get(
                         f"{self.webfsapi_endpoint}/{path}", params=params
                     )
@@ -253,9 +253,19 @@ class AFSAPI:
     async def handle_get(self, item: str) -> ET.Element:
         return await self.__call(f"GET/{item}")
 
-    async def handle_set(self, item: str, value: t.Any) -> t.Optional[bool]:
+    async def handle_set(
+        self,
+        item: str,
+        value: t.Any,
+        throttle_wait_after_call: float = TIME_AFTER_SET_CALLS_IN_SECONDS,
+    ) -> t.Optional[bool]:
         status = unpack_xml(
-            await self.__call(f"SET/{item}", dict(value=value)), "status"
+            await self.__call(
+                f"SET/{item}",
+                dict(value=value),
+                throttle_wait_after_call=throttle_wait_after_call,
+            ),
+            "status",
         )
         return maybe(status, lambda x: x == "FS_OK")
 
@@ -352,7 +362,11 @@ class AFSAPI:
 
     async def set_power(self, value: bool = False) -> t.Optional[bool]:
         """Power on or off the device."""
-        power = await self.handle_set(API["power"], int(value))
+        power = await self.handle_set(
+            API["power"],
+            int(value),
+            throttle_wait_after_call=TIME_AFTER_SLOW_SET_CALLS_IN_SECONDS,
+        )
         return bool(power)
 
     async def get_volume_steps(self) -> t.Optional[int]:
@@ -582,7 +596,9 @@ class AFSAPI:
     async def set_mode(self, value: t.Union[PlayerMode, str]) -> t.Optional[bool]:
         """Set the currently active mode on the device (DAB, FM, Spotify)."""
         result = await self.handle_set(
-            API["mode"], value.key if isinstance(value, PlayerMode) else value
+            API["mode"],
+            value.key if isinstance(value, PlayerMode) else value,
+            throttle_wait_after_call=TIME_AFTER_SLOW_SET_CALLS_IN_SECONDS,
         )
         self._current_nav_path = []
         return result
@@ -601,10 +617,12 @@ class AFSAPI:
     async def _enable_nav_if_necessary(self) -> None:
         nav_state = await self.handle_int(API["nav_state"])
         if nav_state != 1:
-            await self.handle_set(API["nav_state"], 1)
-
-            # Allow the device to get into nav mode, this is slow!
-            await asyncio.sleep(2 * self.time_between_calls)
+            await self.handle_set(
+                API["nav_state"],
+                1,
+                throttle_wait_after_call=TIME_AFTER_SLOW_SET_CALLS_IN_SECONDS,
+                # changing to navigation can be very slow!
+            )
 
             # the nav path is empty, as we needed to set the radio into nav-mode
             self._current_nav_path = []
@@ -621,21 +639,33 @@ class AFSAPI:
 
     async def nav_select_folder(self, value: int) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
-        result = await self.handle_set(API["navigate"], value)
+        result = await self.handle_set(
+            API["navigate"],
+            value,
+            throttle_wait_after_call=TIME_AFTER_SLOW_SET_CALLS_IN_SECONDS,
+        )
         self._current_nav_path.append(value)
 
         return result
 
     async def nav_select_parent_folder(self) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
-        result = await self.handle_set(API["navigate"], "0xffffffff")
+        result = await self.handle_set(
+            API["navigate"],
+            "0xffffffff",
+            throttle_wait_after_call=TIME_AFTER_SLOW_SET_CALLS_IN_SECONDS,
+        )
         self._current_nav_path.pop()
 
         return result
 
     async def nav_select_item(self, value: int) -> t.Optional[bool]:
         await self._enable_nav_if_necessary()
-        return await self.handle_set(API["selectItem"], value)
+        return await self.handle_set(
+            API["selectItem"],
+            value,
+            throttle_wait_after_call=TIME_AFTER_SLOW_SET_CALLS_IN_SECONDS,
+        )
 
     async def nav_reset(self) -> t.Optional[bool]:
         self._current_nav_path = []
@@ -708,4 +738,5 @@ class AFSAPI:
         return await self.handle_set(
             API["selectPreset"],
             value.key if isinstance(value, Preset) else value,
+            throttle_wait_after_call=TIME_AFTER_SLOW_SET_CALLS_IN_SECONDS,
         )

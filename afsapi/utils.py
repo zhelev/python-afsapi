@@ -17,7 +17,9 @@ A = t.TypeVar("A")
 B = t.TypeVar("B")
 
 
-def maybe(val: t.Optional[A], fn: t.Union[t.Callable[[A], B], t.Type[B]]) -> t.Optional[B]:
+def maybe(
+    val: t.Optional[A], fn: t.Union[t.Callable[[A], B], t.Type[B]]
+) -> t.Optional[B]:
     if val is not None:
         return fn(val)  # type: ignore
     return None
