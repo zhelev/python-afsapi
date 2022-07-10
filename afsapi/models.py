@@ -28,11 +28,11 @@ class PlayControl(IntEnum):
 @dataclass
 class PlayerMode:
     id: str
-    selectable: int
     label: str
-    streamable: int
-    modetype: int
     key: str
+    selectable: t.Optional[int] = None
+    streamable: t.Optional[int] = None
+    modetype: t.Optional[int] = None
 
 
 @dataclass
@@ -44,5 +44,5 @@ class Equaliser:
 @dataclass
 class Preset:
     key: int
-    type: t.Optional[str]
-    name: t.Optional[str]
+    type: t.Optional[str] = None
+    name: t.Optional[str] = None
