@@ -521,7 +521,7 @@ class AFSAPI:
     # EQ Presets
     async def get_eq_preset(self) -> t.Optional[Equaliser]:
         v = await self.handle_int(API["eqpreset"])
-        if not v:
+        if v is None:
             return None
 
         for eq in await self.get_equalisers():
