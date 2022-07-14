@@ -161,6 +161,7 @@ class AFSAPI:
 
     # http request helpers
     async def _create_session(self) -> t.Optional[str]:
+        self.sid = None
         return unpack_xml(
             await self.__call("CREATE_SESSION", retry_with_session=False), "sessionId"
         )
