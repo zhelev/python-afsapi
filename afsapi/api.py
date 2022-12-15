@@ -49,6 +49,10 @@ API = {
     # sys
     "power": "netRemote.sys.power",
     "mode": "netRemote.sys.mode",
+    "wired_mac": "netRemote.sys.net.wired.macAddress",
+    "wired_active": "netRemote.sys.net.wired.interfaceEnable",
+    "wlan_mac": "netRemote.sys.net.wlan.macAddress",
+    "wlan_active": "netRemote.sys.net.wlan.interfaceEnable",
     # sys.info
     "friendly_name": "netRemote.sys.info.friendlyName",
     "radio_id": "netRemote.sys.info.radioId",
@@ -355,6 +359,14 @@ class AFSAPI:
     async def get_radio_id(self) -> t.Optional[str]:
         """Get the friendly name of the device."""
         return await self.handle_text(API["radio_id"])
+
+    async def get_mac(self) -> t.Optional[str]:
+        """Get the MAC address of the device."""
+        on_wlan = await self.handle_int(API["wlan_active"])
+        if bool(on_wlan):
+            return await self.handle_text(API["wlan_mac"])
+        else:
+            return await self.handle_text(API["wired_mac"])
 
     async def get_power(self) -> t.Optional[bool]:
         """Check if the device is on."""
