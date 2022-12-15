@@ -635,7 +635,7 @@ class AFSAPI:
         """Check when and if the device is going to sleep."""
         return await self.handle_long(API["sleep"])
 
-    async def set_sleep(self, value: bool = False) -> t.Optional[bool]:
+    async def set_sleep(self, value: int = 0) -> t.Optional[bool]:
         """Set device sleep timer."""
         return await self.handle_set(API["sleep"], int(value))
 
