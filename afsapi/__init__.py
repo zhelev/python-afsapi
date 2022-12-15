@@ -16,3 +16,8 @@ except PackageNotFoundError:  # pragma: no cover
             "use the PyPI ones."
         )
 __version__ = VERSION
+
+__all__ = ['AFSAPI', 'PlayState', 'PlayControl', 'PlayerMode', 'Equaliser',
+           'Preset', 'FSApiException', 'NotImplementedException',
+           'ConnectionError', 'OutOfRangeException', 'InvalidPinException',
+           'InvalidSessionException']

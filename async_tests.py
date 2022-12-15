@@ -10,7 +10,7 @@ PIN = 1234
 TIMEOUT = 2  # in seconds
 
 
-async def test_sys():
+async def test_sys() -> None:
     """Test sys functions."""
     try:
         afsapi = await AFSAPI.create(URL, PIN, TIMEOUT)
@@ -38,7 +38,7 @@ async def test_sys():
         logging.error(traceback.format_exc())
 
 
-async def test_volume():
+async def test_volume() -> None:
     """Test volume functions."""
     try:
         afsapi = await AFSAPI.create(URL, PIN, TIMEOUT)
@@ -70,7 +70,7 @@ async def test_volume():
         logging.error(traceback.format_exc())
 
 
-async def test_info():
+async def test_info() -> None:
     """Test info functions."""
     try:
         afsapi = await AFSAPI.create(URL, PIN, TIMEOUT)
@@ -113,7 +113,7 @@ async def test_info():
         logging.error(traceback.format_exc())
 
 
-async def test_play():
+async def test_play() -> None:
     """Test play functions."""
     try:
         afsapi = await AFSAPI.create(URL, PIN, TIMEOUT)
