@@ -84,6 +84,7 @@ async def test_info():
         print(f"Radio ID: {await afsapi.get_radio_id()}")
         print(f"Version: {await afsapi.get_version()}")
         print(f"MAC: {await afsapi.get_mac()}")
+        print(f"RSSI: {await afsapi.get_rssi()} dBm")
 
         name = await afsapi.get_play_name()
         print("Name: %s" % name)

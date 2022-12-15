@@ -53,6 +53,7 @@ API = {
     "wired_active": "netRemote.sys.net.wired.interfaceEnable",
     "wlan_mac": "netRemote.sys.net.wlan.macAddress",
     "wlan_active": "netRemote.sys.net.wlan.interfaceEnable",
+    "rssi": "netRemote.sys.net.wlan.rssi",
     # sys.info
     "friendly_name": "netRemote.sys.info.friendlyName",
     "radio_id": "netRemote.sys.info.radioId",
@@ -367,6 +368,19 @@ class AFSAPI:
             return await self.handle_text(API["wlan_mac"])
         else:
             return await self.handle_text(API["wired_mac"])
+
+    async def get_rssi(self) -> t.Optional[int]:
+        """Get the current wlan Received Signal Strength Indication in dBm"""
+
+        # RSSI is returned as a percentage by the API, scaled linearly between
+        # -80dBm (0%) and -20dBm (100%).  100% indicates a wired
+        # connection.  This functions returns the dBm value of RSSI.
+
+        rssi = await self.handle_int(API["rssi"])
+        if rssi is not None:
+            return int(round(rssi * 0.6 - 80))
+        else:
+            return None
 
     async def get_power(self) -> t.Optional[bool]:
         """Check if the device is on."""
