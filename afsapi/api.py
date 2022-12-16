@@ -49,6 +49,11 @@ API = {
     # sys
     "power": "netRemote.sys.power",
     "mode": "netRemote.sys.mode",
+    "wired_mac": "netRemote.sys.net.wired.macAddress",
+    "wired_active": "netRemote.sys.net.wired.interfaceEnable",
+    "wlan_mac": "netRemote.sys.net.wlan.macAddress",
+    "wlan_active": "netRemote.sys.net.wlan.interfaceEnable",
+    "rssi": "netRemote.sys.net.wlan.rssi",
     # sys.info
     "friendly_name": "netRemote.sys.info.friendlyName",
     "radio_id": "netRemote.sys.info.radioId",
@@ -356,6 +361,27 @@ class AFSAPI:
         """Get the friendly name of the device."""
         return await self.handle_text(API["radio_id"])
 
+    async def get_mac(self) -> t.Optional[str]:
+        """Get the MAC address of the device."""
+        on_wlan = await self.handle_int(API["wlan_active"])
+        if bool(on_wlan):
+            return await self.handle_text(API["wlan_mac"])
+        else:
+            return await self.handle_text(API["wired_mac"])
+
+    async def get_rssi(self) -> t.Optional[int]:
+        """Get the current wlan Received Signal Strength Indication in dBm"""
+
+        # RSSI is returned as a percentage by the API, scaled linearly between
+        # -80dBm (0%) and -20dBm (100%).  100% indicates a wired
+        # connection.  This functions returns the dBm value of RSSI.
+
+        rssi = await self.handle_int(API["rssi"])
+        if rssi is not None:
+            return int(round(rssi * 0.6 - 80))
+        else:
+            return None
+
     async def get_power(self) -> t.Optional[bool]:
         """Check if the device is on."""
         power = await self.handle_int(API["power"])
@@ -609,7 +635,7 @@ class AFSAPI:
         """Check when and if the device is going to sleep."""
         return await self.handle_long(API["sleep"])
 
-    async def set_sleep(self, value: bool = False) -> t.Optional[bool]:
+    async def set_sleep(self, value: int = 0) -> t.Optional[bool]:
         """Set device sleep timer."""
         return await self.handle_set(API["sleep"], int(value))
 

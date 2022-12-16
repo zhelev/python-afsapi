@@ -1,6 +1,13 @@
 from .api import AFSAPI  # noqa
-from .models import *  # noqa
-from .exceptions import *  # noqa
+from afsapi.exceptions import (
+    FSApiException,
+    InvalidPinException,
+    InvalidSessionException,
+    NotImplementedException,
+    OutOfRangeException,
+    ConnectionError,
+)
+from afsapi.models import Preset, Equaliser, PlayerMode, PlayControl, PlayState
 
 from importlib.metadata import version, PackageNotFoundError
 
@@ -16,3 +23,8 @@ except PackageNotFoundError:  # pragma: no cover
             "use the PyPI ones."
         )
 __version__ = VERSION
+
+__all__ = ['AFSAPI', 'PlayState', 'PlayControl', 'PlayerMode', 'Equaliser',
+           'Preset', 'FSApiException', 'NotImplementedException',
+           'ConnectionError', 'OutOfRangeException', 'InvalidPinException',
+           'InvalidSessionException']
