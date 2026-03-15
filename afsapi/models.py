@@ -11,6 +11,7 @@ class PlayState(IntEnum):
 
 
 class PlayControl(IntEnum):
+    STOP = 0
     PLAY = 1
     PAUSE = 2
     NEXT = 3
