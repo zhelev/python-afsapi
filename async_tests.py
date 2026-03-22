@@ -121,20 +121,27 @@ async def test_play() -> None:
         status = await afsapi.get_play_status()
         print("Status: %s" % status)
 
+        pause = await afsapi.pause()
+        print("Start play succeeded? - %s" % pause)
+        await asyncio.sleep(2)
+
         start_play = await afsapi.play()
         print("Start play succeeded? - %s" % start_play)
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
 
         forward = await afsapi.forward()
         print("Next succeeded? - %s" % forward)
-        await asyncio.sleep(1)
+        await asyncio.sleep(2)
 
         rewind = await afsapi.rewind()
         print("Prev succeeded? - %s" % rewind)
 
+        stop = await afsapi.stop()
+        print("Stop play succeeded? - %s" % stop)
+        await asyncio.sleep(2)
+
     except Exception:
         logging.error(traceback.format_exc())
-
 
 loop = asyncio.new_event_loop()
 
