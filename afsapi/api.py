@@ -519,30 +519,18 @@ class AFSAPI:
 
     async def play(self) -> t.Optional[bool]:
         """Play media."""
-        mode = await self.get_mode()
-        if mode.label == "Internet radio":
-            return await self.play_control(PlayControl.STOP)
         return await self.play_control(PlayControl.PLAY)
 
     async def pause(self) -> t.Optional[bool]:
         """Pause playing."""
-        mode = await self.get_mode()
-        if mode.label == "Internet radio":
-            return await self.play_control(PlayControl.STOP)
         return await self.play_control(PlayControl.PAUSE)
 
     async def forward(self) -> t.Optional[bool]:
         """Next media."""
-        mode = await self.get_mode()
-        if mode.label == "Internet radio":
-            return None #Not supported
         return await self.play_control(PlayControl.NEXT)
 
     async def rewind(self) -> t.Optional[bool]:
         """Previous media."""
-        mode = await self.get_mode()
-        if mode.label == "Internet radio":
-            return None #Not supported
         return await self.play_control(PlayControl.PREV)
 
     async def get_equalisers(self) -> t.List[Equaliser]:
