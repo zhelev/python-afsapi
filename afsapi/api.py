@@ -517,6 +517,10 @@ class AFSAPI:
         """
         return await self.handle_set(API["control"], int(value))
 
+    async def stop(self) -> t.Optional[bool]:
+        """Stop (and Start) media."""
+        return await self.play_control(PlayControl.STOP)
+    
     async def play(self) -> t.Optional[bool]:
         """Play media."""
         return await self.play_control(PlayControl.PLAY)
