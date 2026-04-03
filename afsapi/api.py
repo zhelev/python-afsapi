@@ -222,7 +222,7 @@ class AFSAPI:
                     raise FSApiException(
                         f"Unexpected result {result.status}: {await result.text()}"
                     )
-                doc = ET.fromstring(await result.text(encoding="utf-8"))
+                doc = ET.fromstring(await result.text(encoding="utf-8", errors="replace"))
                 status = unpack_xml(doc, "status")
 
                 if status == "FS_OK" or status == "FS_LIST_END":
